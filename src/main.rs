@@ -9,10 +9,22 @@ use layouts_rs::{
     corpus::Corpus,
     layout::Layout,
     metrics::Metrics,
+    metrics::SimpleMetrics,
     optimizer::{self, HillClimbOptimizer, Optimizer, SimulatedAnnealingOptimizer},
+    optimizer::{self, HillClimbOptimizer, Optimizer, SimulatedAnnealingOptimizer, Targets},
+    stats::SimpleStats,
     stats::Stats,
 };
 use rand::{Rng, rng};
+
+macro_rules! field_named_tuple {
+    ($stats:expr, $field:ident()) => {
+        (stringify!($field), $stats.$field())
+    };
+    ($stats:expr, $field:ident) => {
+        (stringify!($field), $stats.$field.clone())
+    };
+}
 
 #[derive(Parser)]
 struct Cli {
@@ -30,6 +42,7 @@ fn parse_level_filter(level: &str) -> Result<LevelFilter, ParseLevelError> {
 enum Command {
     Analyze(AnalyzeArgs),
     Optimize(OptimizeArgs),
+    GenerateOptimizationTargets(GenerateOptimizationTargetsArgs),
 }
 
 #[derive(Parser)]
@@ -44,6 +57,14 @@ struct OptimizeArgs {
     common: CommonConfig,
     #[command(flatten)]
     run_options: RunOptions,
+}
+
+#[derive(Parser)]
+struct GenerateOptimizationTargetsArgs {
+    #[command(flatten)]
+    common: CommonConfig,
+    #[arg(long, value_name = "PATH", help = "Path to a TOML presets file")]
+    presets: String,
 }
 
 #[derive(Parser, Clone)]
@@ -215,6 +236,27 @@ impl Command {
                 info!("Optimization score: {score:.4}");
                 info!("{stats}");
             }
+            Command::GenerateOptimizationTargets(args) => {
+                let config = Config::load(Path::new(&args.common.config))?;
+
+                let presets = Self::load_presets(Path::new(&args.presets))?;
+
+                let corpus = args.common.corpus();
+                let analyzer = Analyzer::new(corpus);
+
+                let mut all_stats = Vec::new();
+                for (name, preset) in presets {
+                    let layout = Layout::new(&preset, &config.layout)
+                        .map_err(|e| anyhow::anyhow!("Failed to load preset {name}: {e}"))?;
+
+                    let mut metrics = SimpleMetrics::default();
+                    analyzer.analyze(&layout, &mut metrics);
+                    all_stats.push(SimpleStats::from(metrics));
+                }
+
+                let output = render_optimization_targets(&config.optimization.targets, &all_stats)?;
+                println!("{output}");
+            }
         }
         Ok(())
     }
@@ -236,6 +278,14 @@ impl Command {
             )),
         }
     }
+
+    fn load_presets(path: &Path) -> anyhow::Result<Vec<(String, String)>> {
+        let content = fs::read_to_string(path)?;
+        let presets: HashMap<String, String> = toml::from_str(&content)?;
+        let mut presets: Vec<_> = presets.into_iter().collect();
+        presets.sort_by(|(left, _), (right, _)| left.cmp(right));
+        Ok(presets)
+    }
 }
 
 fn main() -> anyhow::Result<()> {
@@ -250,4 +300,99 @@ fn main() -> anyhow::Result<()> {
 
     cli.command.run()?;
     Ok(())
+}
+
+fn compute_metric_scales(all_stats: &[SimpleStats]) -> HashMap<&'static str, f64> {
+    let mut series: HashMap<_, Vec<f64>> = HashMap::new();
+    for stats in all_stats {
+        for (name, value) in scalar_metrics(stats) {
+            series.entry(name).or_default().push(value);
+        }
+    }
+
+    series
+        .into_iter()
+        .map(|(name, values)| {
+            let n = values.len() as f64;
+            let mean = values.iter().sum::<f64>() / n;
+            let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / n;
+            let std = variance.sqrt();
+            (name, if std > 0.0 { std } else { 1.0 })
+        })
+        .collect()
+}
+
+fn render_optimization_targets(
+    targets: &Targets,
+    all_stats: &[SimpleStats],
+) -> anyhow::Result<String> {
+    let scales = compute_metric_scales(all_stats);
+    let rows = [
+        field_named_tuple!(&targets, effort),
+        field_named_tuple!(&targets, pinky_off_home),
+        field_named_tuple!(&targets, left_hand_usage),
+        field_named_tuple!(&targets, bigram_skips_1),
+        field_named_tuple!(&targets, bigram_skips_n),
+        field_named_tuple!(&targets, bigram_scissors),
+        field_named_tuple!(&targets, bigram_scissors_wide),
+        field_named_tuple!(&targets, bigram_lateral_stretches),
+        field_named_tuple!(&targets, trigram_skips_1_same_hand),
+        field_named_tuple!(&targets, trigram_skips_1_alternation),
+        field_named_tuple!(&targets, trigram_skips_n_same_hand),
+        field_named_tuple!(&targets, trigram_skips_n_alternation),
+        field_named_tuple!(&targets, trigram_scissors_same_hand),
+        field_named_tuple!(&targets, trigram_scissors_alternation),
+        field_named_tuple!(&targets, trigram_scissors_wide_same_hand),
+        field_named_tuple!(&targets, trigram_scissors_wide_alternation),
+        field_named_tuple!(&targets, trigram_lateral_stretches_same_hand),
+        field_named_tuple!(&targets, trigram_lateral_stretches_alternation),
+        field_named_tuple!(&targets, trigram_redirects_strong),
+        field_named_tuple!(&targets, trigram_redirects_weak),
+        field_named_tuple!(&targets, trigram_roll_ratio),
+        field_named_tuple!(&targets, trigram_roll_ratio_bigrams),
+        field_named_tuple!(&targets, trigram_alternations),
+    ];
+
+    let mut out = String::from("[optimization.targets]\n");
+    for (name, target) in rows {
+        let scale = scales
+            .get(name)
+            .copied()
+            .ok_or_else(|| anyhow::anyhow!("Missing computed scale for target {name}"))?;
+        out.push_str(&format!(
+            "{name} = {{ value = {:.1}, weight = {:.1}, scale = {scale} }}",
+            target.value, target.weight
+        ));
+        out.push('\n');
+    }
+
+    Ok(out)
+}
+
+fn scalar_metrics(stats: &SimpleStats) -> Vec<(&'static str, f64)> {
+    vec![
+        field_named_tuple!(stats, effort),
+        field_named_tuple!(stats, pinky_off_home),
+        field_named_tuple!(stats, left_hand_usage),
+        field_named_tuple!(stats, bigram_skips_1),
+        field_named_tuple!(stats, bigram_skips_n),
+        field_named_tuple!(stats, bigram_scissors),
+        field_named_tuple!(stats, bigram_scissors_wide),
+        field_named_tuple!(stats, bigram_lateral_stretches),
+        field_named_tuple!(stats, trigram_skips_1_same_hand),
+        field_named_tuple!(stats, trigram_skips_1_alternation),
+        field_named_tuple!(stats, trigram_skips_n_same_hand),
+        field_named_tuple!(stats, trigram_skips_n_alternation),
+        field_named_tuple!(stats, trigram_scissors_same_hand),
+        field_named_tuple!(stats, trigram_scissors_alternation),
+        field_named_tuple!(stats, trigram_scissors_wide_same_hand),
+        field_named_tuple!(stats, trigram_scissors_wide_alternation),
+        field_named_tuple!(stats, trigram_lateral_stretches_same_hand),
+        field_named_tuple!(stats, trigram_lateral_stretches_alternation),
+        field_named_tuple!(stats, trigram_redirects_strong),
+        field_named_tuple!(stats, trigram_redirects_weak),
+        field_named_tuple!(stats, trigram_roll_ratio()),
+        field_named_tuple!(stats, trigram_roll_ratio_bigrams()),
+        field_named_tuple!(stats, trigram_alternations),
+    ]
 }
