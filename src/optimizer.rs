@@ -3,20 +3,28 @@ use std::collections::HashSet;
 use std::fmt;
 use std::sync::Arc;
 
+use indexmap::IndexMap;
 use log::{debug, info};
 use rand::{Rng, prelude::*, rngs::StdRng};
 use rayon::prelude::*;
 use serde::Deserialize;
+
+pub use crate::targets::Targets;
+
+#[allow(unused_imports)]
+use crate::targets::MapTarget;
 
 use crate::{
     analyzer::Analyzer,
     layout::Layout,
     matrix::Pos,
     metrics::Metrics,
-    stats::Stats,
+    stats::*,
     swaps::{SwapMove, SwapMoveBuilder, SwapMoveStrategy},
-    targets::Targets,
+    targets::SingleTarget,
 };
+
+include!(concat!(env!("OUT_DIR"), "/optimization.rs"));
 
 const MAX_PERTURB_ATTEMPTS: usize = 30;
 

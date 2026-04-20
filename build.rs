@@ -27,6 +27,13 @@ struct TargetsTemplate {
     targets: Vec<dsl::Target>,
 }
 
+#[derive(Debug, Template)]
+#[template(path = "optimization.rs.j2", escape = "none")]
+struct OptimizationTemplate {
+    stats: dsl::Stats,
+    targets: Vec<dsl::Target>,
+}
+
 fn main() -> Result<()> {
     let manifest_dir =
         PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").context("read CARGO_MANIFEST_DIR")?);
@@ -61,6 +68,16 @@ fn main() -> Result<()> {
         "templates/targets.rs.j2",
         &out_dir.join("targets.rs"),
         TargetsTemplate {
+            targets: rules.targets.clone(),
+        },
+    )?;
+
+    generate(
+        &rules_path.to_string_lossy(),
+        "templates/optimization.rs.j2",
+        &out_dir.join("optimization.rs"),
+        OptimizationTemplate {
+            stats: rules.stats.clone(),
             targets: rules.targets.clone(),
         },
     )?;

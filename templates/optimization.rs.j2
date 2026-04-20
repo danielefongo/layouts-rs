@@ -1,0 +1,170 @@
+fn scalar_std_dev(stats_list: &[f64], mean: f64) -> f64 {
+    (stats_list
+        .iter()
+        .map(|v| (v - mean) * (v - mean))
+        .sum::<f64>()
+        / (stats_list.len() as f64))
+        .sqrt()
+}
+
+fn map_std_dev<K>(
+    stats_list: &[&IndexMap<K, f64>],
+    mean_map: &IndexMap<K, f64>,
+) -> IndexMap<K, f64>
+where
+    K: Eq + std::hash::Hash + Clone,
+{
+    mean_map
+        .iter()
+        .map(|(k, mean)| {
+            let variance = stats_list
+                .iter()
+                .map(|m| {
+                    let v = m.get(k).unwrap_or(&0.0);
+                    (v - mean) * (v - mean)
+                })
+                .sum::<f64>()
+                / (stats_list.len() as f64);
+            (k.clone(), variance.sqrt())
+        })
+        .collect()
+}
+
+#[allow(dead_code)]
+fn map_scale<K>(values: &IndexMap<K, f64>) -> f64 {
+    values
+        .values()
+        .copied()
+        .fold(0.0, f64::max)
+        .max(1e-6)
+}
+
+fn mean_f64(values: &[f64]) -> f64 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    values.iter().sum::<f64>() / values.len() as f64
+}
+
+fn mean_map<K>(maps: &[&IndexMap<K, f64>]) -> IndexMap<K, f64>
+where
+    K: Eq + std::hash::Hash + Clone,
+{
+    if maps.is_empty() {
+        return IndexMap::new();
+    }
+
+    let mut result: IndexMap<K, f64> = IndexMap::new();
+    for map in maps {
+        for (k, v) in *map {
+            *result.entry(k.clone()).or_default() += v;
+        }
+    }
+
+    result.iter_mut().for_each(|(_, v)| *v /= maps.len() as f64);
+    result
+}
+
+impl Stats {
+    pub fn mean_and_std_dev(stats_list: &[Stats]) -> (Stats, Stats) {
+        let mean = Stats {
+            {%- for section in stats.sections %}
+            {{ section.name }}: {{ section.name | capitalize }}Stats {
+                {%- for stat in section.stats %}
+                {%- match stat.ty %}
+                {%- when dsl::Ty::Scalar %}
+                {{ stat.name }}: mean_f64(&stats_list.iter().map(|s| s.{{ section.name }}.{{ stat.name }}).collect::<Vec<_>>()),
+                {%- when dsl::Ty::Map(_) %}
+                {{ stat.name }}: mean_map(&stats_list.iter().map(|s| &s.{{ section.name }}.{{ stat.name }}).collect::<Vec<_>>()),
+                {%- endmatch %}
+                {%- endfor %}
+            },
+            {%- endfor %}
+        };
+
+        let std_dev = Stats {
+            {%- for section in stats.sections %}
+            {{ section.name }}: {{ section.name | capitalize }}Stats {
+                {%- for stat in section.stats %}
+                {%- match stat.ty %}
+                {%- when dsl::Ty::Scalar %}
+                {{ stat.name }}: scalar_std_dev(
+                    &stats_list.iter().map(|s| s.{{ section.name }}.{{ stat.name }}).collect::<Vec<_>>(),
+                    mean.{{ section.name }}.{{ stat.name }},
+                ),
+                {%- when dsl::Ty::Map(_) %}
+                {{ stat.name }}: map_std_dev(
+                    &stats_list.iter().map(|s| &s.{{ section.name }}.{{ stat.name }}).collect::<Vec<_>>(),
+                    &mean.{{ section.name }}.{{ stat.name }},
+                ),
+                {%- endmatch %}
+                {%- endfor %}
+            },
+            {%- endfor %}
+        };
+
+        (mean, std_dev)
+    }
+}
+
+impl Targets {
+    pub fn from_mean_and_std_dev(mean: &Stats, std_dev: &Stats) -> Targets {
+        Targets {
+            {%- for target in targets %}
+            {%- match target.ty %}
+            {%- when dsl::Ty::Scalar %}
+            {{ target.name }}: SingleTarget {
+                value: mean.{{ target.source }},
+                weight: 1.0,
+                scale: std_dev.{{ target.source }}.max(1e-6),
+            },
+            {%- when dsl::Ty::Map(_) %}
+            {{ target.name }}: MapTarget {
+                values: mean.{{ target.source }}.clone(),
+                weight: 1.0,
+                scale: map_scale(&std_dev.{{ target.source }}),
+            },
+            {%- endmatch %}
+            {%- endfor %}
+        }
+    }
+
+    pub fn print(&self) -> String {
+        let mut doc = toml_edit::DocumentMut::new();
+        let mut table = toml_edit::Table::new();
+
+        {%- for target in targets %}
+        {
+            let mut t = toml_edit::InlineTable::new();
+            {%- match target.ty %}
+            {%- when dsl::Ty::Scalar %}
+            t.insert("value", toml_edit::Value::from(self.{{ target.name }}.value));
+            t.insert("weight", toml_edit::Value::from(self.{{ target.name }}.weight));
+            t.insert("scale", toml_edit::Value::from(self.{{ target.name }}.scale));
+            {%- when dsl::Ty::Map(kind) %}
+            {
+                let mut value = toml_edit::InlineTable::new();
+                for (k, v) in &self.{{ target.name }}.values {
+                    {%- if kind == "Finger" %}
+                    let key = u8::from(*k).to_string();
+                    {%- else %}
+                    let key = k.to_string();
+                    {%- endif %}
+                    value.insert(key, toml_edit::Value::from(*v));
+                }
+                t.insert("value", toml_edit::Value::InlineTable(value));
+                t.insert("weight", toml_edit::Value::from(self.{{ target.name }}.weight));
+                t.insert("scale", toml_edit::Value::from(self.{{ target.name }}.scale));
+            }
+            {%- endmatch %}
+            table.insert(
+                "{{ target.name }}",
+                toml_edit::Item::Value(toml_edit::Value::InlineTable(t)),
+            );
+        }
+        {%- endfor %}
+
+        doc.insert("optimization.targets", toml_edit::Item::Table(table));
+        doc.to_string()
+    }
+}
