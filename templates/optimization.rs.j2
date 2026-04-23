@@ -121,8 +121,16 @@ impl Targets {
             {%- when dsl::Ty::Map(_) %}
             {{ target.name }}: MapTarget {
                 values: mean.{{ target.source }}.clone(),
-                weight: 1.0,
-                scale: map_scale(&std_dev.{{ target.source }}),
+                weight: mean
+                    .{{ target.source }}
+                    .iter()
+                    .map(|(k, _)| (k.clone(), 1.0))
+                    .collect(),
+                scale: std_dev
+                    .{{ target.source }}
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.max(1e-6)))
+                    .collect(),
             },
             {%- endmatch %}
             {%- endfor %}
@@ -145,7 +153,7 @@ impl Targets {
             {
                 let mut value = toml_edit::InlineTable::new();
                 for (k, v) in &self.{{ target.name }}.values {
-                    {%- if kind == "Finger" %}
+                    {%- if kind.0 == "Finger" %}
                     let key = u8::from(*k).to_string();
                     {%- else %}
                     let key = k.to_string();
@@ -153,8 +161,28 @@ impl Targets {
                     value.insert(key, toml_edit::Value::from(*v));
                 }
                 t.insert("value", toml_edit::Value::InlineTable(value));
-                t.insert("weight", toml_edit::Value::from(self.{{ target.name }}.weight));
-                t.insert("scale", toml_edit::Value::from(self.{{ target.name }}.scale));
+
+                let mut weight = toml_edit::InlineTable::new();
+                for (k, v) in &self.{{ target.name }}.weight {
+                    {%- if kind.0 == "Finger" %}
+                    let key = u8::from(*k).to_string();
+                    {%- else %}
+                    let key = k.to_string();
+                    {%- endif %}
+                    weight.insert(key, toml_edit::Value::from(*v));
+                }
+                t.insert("weight", toml_edit::Value::InlineTable(weight));
+
+                let mut scale = toml_edit::InlineTable::new();
+                for (k, v) in &self.{{ target.name }}.scale {
+                    {%- if kind.0 == "Finger" %}
+                    let key = u8::from(*k).to_string();
+                    {%- else %}
+                    let key = k.to_string();
+                    {%- endif %}
+                    scale.insert(key, toml_edit::Value::from(*v));
+                }
+                t.insert("scale", toml_edit::Value::InlineTable(scale));
             }
             {%- endmatch %}
             table.insert(
