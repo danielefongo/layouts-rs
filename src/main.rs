@@ -245,7 +245,7 @@ impl Command {
                 let (mean, std_dev) = Stats::mean_and_std_dev(&all_stats);
                 let targets = Targets::from_mean_and_std_dev(&mean, &std_dev);
 
-                println!("{}", targets.print());
+                println!("{}", targets.print(5));
             }
         }
         Ok(())
