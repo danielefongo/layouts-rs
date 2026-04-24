@@ -158,33 +158,21 @@ impl Targets {
             {
                 let mut value = toml_edit::InlineTable::new();
                 for (k, v) in &self.{{ target.name }}.values {
-                    {%- if kind.0 == "Finger" %}
-                    let key = u8::from(*k).to_string();
-                    {%- else %}
                     let key = k.to_string();
-                    {%- endif %}
                     value.insert(key, toml_edit::Value::from(round(*v, digits)));
                 }
                 t.insert("value", toml_edit::Value::InlineTable(value));
 
                 let mut weight = toml_edit::InlineTable::new();
                 for (k, v) in &self.{{ target.name }}.weight {
-                    {%- if kind.0 == "Finger" %}
-                    let key = u8::from(*k).to_string();
-                    {%- else %}
                     let key = k.to_string();
-                    {%- endif %}
                     weight.insert(key, toml_edit::Value::from(round(*v, digits)));
                 }
                 t.insert("weight", toml_edit::Value::InlineTable(weight));
 
                 let mut scale = toml_edit::InlineTable::new();
                 for (k, v) in &self.{{ target.name }}.scale {
-                    {%- if kind.0 == "Finger" %}
-                    let key = u8::from(*k).to_string();
-                    {%- else %}
                     let key = k.to_string();
-                    {%- endif %}
                     scale.insert(key, toml_edit::Value::from(round(*v, digits)));
                 }
                 t.insert("scale", toml_edit::Value::InlineTable(scale));
