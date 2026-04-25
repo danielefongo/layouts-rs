@@ -157,21 +157,27 @@ impl Targets {
             {%- when dsl::Ty::Map(kind) %}
             {
                 let mut value = toml_edit::InlineTable::new();
-                for (k, v) in &self.{{ target.name }}.values {
+                let mut entries: Vec<_> = self.{{ target.name }}.values.iter().collect();
+                entries.sort_by(|a, b| a.0.partial_cmp(b.0).unwrap());
+                for (k, v) in entries {
                     let key = k.to_string();
                     value.insert(key, toml_edit::Value::from(round(*v, digits)));
                 }
                 t.insert("value", toml_edit::Value::InlineTable(value));
 
                 let mut weight = toml_edit::InlineTable::new();
-                for (k, v) in &self.{{ target.name }}.weight {
+                let mut entries: Vec<_> = self.{{ target.name }}.weight.iter().collect();
+                entries.sort_by(|a, b| a.0.partial_cmp(b.0).unwrap());
+                for (k, v) in entries {
                     let key = k.to_string();
                     weight.insert(key, toml_edit::Value::from(round(*v, digits)));
                 }
                 t.insert("weight", toml_edit::Value::InlineTable(weight));
 
                 let mut scale = toml_edit::InlineTable::new();
-                for (k, v) in &self.{{ target.name }}.scale {
+                let mut entries: Vec<_> = self.{{ target.name }}.scale.iter().collect();
+                entries.sort_by(|a, b| a.0.partial_cmp(b.0).unwrap());
+                for (k, v) in entries {
                     let key = k.to_string();
                     scale.insert(key, toml_edit::Value::from(round(*v, digits)));
                 }
