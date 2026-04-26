@@ -2,175 +2,175 @@ qwerty: |
       _ q w e r t   y u i o p -
       _ a s d f g   h j k l ; '
       _ z x c v b   n m , . / _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 dvorak: |
       _ ' , . p y   f g c r l /
       _ a o e u i   d h t n s -
       _ ; q j k x   b m w v z _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 colemak: |
       _ q w f p g   j l u y ; -
       _ a r s t d   h n e i o '
       _ z x c v b   k m , . / _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 colemak-dh: |
       _ q w f p b   j l u y ; -
       _ a r s t g   m n e i o '
       _ z x c d v   k h , . / _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 graphite: |
       _ b l d w z   ' f o u j ;
       _ n r t s g   y h a e i ,
       _ q x m c v   k p . - / _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 gallium: |
       _ b l d c v   z y o u , -
       _ n r t s g   p h a e i /
       _ q x m w j   k f ' ; . _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 canary: |
       _ w l y p b   z f o u ; -
       _ c r s t g   m n e i a '
       _ q j v d k   x h / , . _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 aptV3: |
       _ w g d f b   q l u o y -
       _ r s t h k   j n e a i ;
       _ x c m p v   z , . ' / _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 handsdown-neu: |
       _ w f m p v   / . q ; ' z
       _ r s n t b   , a e i h j
       _ x c l d g   - u o y k _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 sturdy: |
       _ v m l c p   x f o u j -
       _ s t r d y   . n a e i /
       _ z k q g w   b h ' ; , _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 engram: |
       _ b y o u '   - l d w v z
       _ c i e a ,   . h t s n q
       _ g x j k /   ; r m f p _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 carbyne: |
       _ f w h g z   q o u y p j
       _ s n r t v   - a e i c '
       _ b m l d k   ; x , . / _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 'really?': |
       _ y u o l z   q c h g w k
       _ i e a r x   v s n t d '
       _ - / , . ;   j f p m b _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 whorf: |
       _ f l h d m   v w o u , /
       _ s r n t k   g y a e i -
       _ x j b z q   p c ' ; . _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 northstar: |
       _ q w m b z   j f o u ; -
       _ n r s t g   y h e i a '
       _ x l c d v   k p , . / _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 semimak: |
       _ f l h v z   q w u o y -
       _ s r n t k   c d e a i ;
       _ x ' b m j   p g , . / _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 mtgap: |
       _ y p o u j   k d l c w -
       _ i n e a ,   m h t s r '
       _ q z / . ;   b f g v x _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 ctgap: |
       _ q p l c j   x f o u / -
       _ r n t s g   y h e i a ;
       _ z b m w v   k d ' , . _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 recurva: |
       _ f r d p v   q j u o y -
       _ s n t c b   . h e a i /
       _ z x k g w   m l ; ' , _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 halmak: |
       _ w l r b z   q g u d j -
       _ s h n t ,   . a e o i '
       _ f m v c /   ; p x k y _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 workman: |
       _ q d r w b   j f u p ; -
       _ a s h t g   y n e o i '
       _ z x m c v   k l , . / _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 nerps: |
       _ x l d p v   z k o u ; q
       _ n r t s g   y h e i a -
       _ / j m c w   b f ' , . _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 focal: |
       _ v l h g k   q f o u j -
       _ s r n t b   y c a e i /
       _ z x m d p   ' w . ; , _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 isrt: |
       _ y c l m k   z f u , ' -
       _ i s r t g   p n e a o ;
       _ q v w d j   b h / . x _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 irst: |
       _ y l c m k   z f u , ' -
       _ i r s t g   b n e a o ;
       _ j x w d v   p h / . q _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 hyperroll: |
       _ p c l m v   x u o y f -
       _ n s r t d   . a e i h ;
       _ b g ' w z   / , q j k _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 pine_v1: |
       _ y l r d w   j m o u , -
       _ c s n t g   p h a e i ;
       _ x z q v k   b f ' / . _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 pine_v4: |
       _ q l c m k   ' f u o y -
       _ n r s t w   p h e a i /
       _ j x z g v   b d ; , . _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 beakl19bis: |
       _ q y o u z   w d n c k -
       _ h i e a ,   g t r s p ;
       _ j ' / . x   v m l f b _
-      _ _ _ _ = _   _ _ _ _ _ _
+      _ _ _ _ _ _   _ _ _ _ _ _
 
 maltron: |
       _ q p y c b   v m u z l =
