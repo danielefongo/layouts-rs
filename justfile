@@ -6,3 +6,6 @@ analyze *args:
 
 optimize *args:
     cargo run --release -- optimize -c {{config}} --corpus {{corpus}} {{args}}
+
+generate:
+    cargo run --release -- generate-optimization-targets -c {{config}} --corpus {{corpus}} --presets ./presets.yaml
