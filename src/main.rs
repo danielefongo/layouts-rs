@@ -271,7 +271,7 @@ impl Command {
 
     fn load_presets(path: &Path) -> anyhow::Result<Vec<(String, String)>> {
         let content = fs::read_to_string(path)?;
-        let presets: HashMap<String, String> = toml::from_str(&content)?;
+        let presets: HashMap<String, String> = serde_yaml::from_str(&content)?;
         let mut presets: Vec<_> = presets.into_iter().collect();
         presets.sort_by(|(left, _), (right, _)| left.cmp(right));
         Ok(presets)

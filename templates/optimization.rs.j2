@@ -1,3 +1,5 @@
+use std::fmt::Write as _;
+
 fn scalar_std_dev(stats_list: &[f64], mean: f64) -> f64 {
     (stats_list
         .iter()
@@ -49,6 +51,11 @@ fn mean_f64(values: &[f64]) -> f64 {
 fn round(v: f64, digits: usize) -> f64 {
     let factor = 10f64.powi(digits as i32);
     (v * factor).round() / factor
+}
+
+fn round_scale(v: f64, digits: usize) -> f64 {
+    let min = 10f64.powi(-(digits as i32));
+    round(v.max(min), digits)
 }
 
 fn mean_map<K>(maps: &[&IndexMap<K, f64>]) -> IndexMap<K, f64>
@@ -125,7 +132,7 @@ impl Targets {
             },
             {%- when dsl::Ty::Map(_) %}
             {{ target.name }}: MapTarget {
-                values: mean.{{ target.source }}.clone(),
+                value: mean.{{ target.source }}.clone(),
                 weight: mean
                     .{{ target.source }}
                     .iter()
@@ -143,55 +150,71 @@ impl Targets {
     }
 
     pub fn print(&self, digits: usize) -> String {
-        let mut doc = toml_edit::DocumentMut::new();
-        let mut table = toml_edit::Table::new();
+        let mut out = String::new();
+        writeln!(&mut out, "optimization:").unwrap();
+        writeln!(&mut out, "  targets:").unwrap();
 
         {%- for target in targets %}
-        {
-            let mut t = toml_edit::InlineTable::new();
-            {%- match target.ty %}
-            {%- when dsl::Ty::Scalar %}
-            t.insert("value", toml_edit::Value::from(round(self.{{ target.name }}.value, digits)));
-            t.insert("weight", toml_edit::Value::from(round(self.{{ target.name }}.weight, digits)));
-            t.insert("scale", toml_edit::Value::from(round(self.{{ target.name }}.scale, digits)));
-            {%- when dsl::Ty::Map(kind) %}
-            {
-                let mut value = toml_edit::InlineTable::new();
-                let mut entries: Vec<_> = self.{{ target.name }}.values.iter().collect();
-                entries.sort_by(|a, b| a.0.partial_cmp(b.0).unwrap());
-                for (k, v) in entries {
-                    let key = k.to_string();
-                    value.insert(key, toml_edit::Value::from(round(*v, digits)));
-                }
-                t.insert("value", toml_edit::Value::InlineTable(value));
-
-                let mut weight = toml_edit::InlineTable::new();
-                let mut entries: Vec<_> = self.{{ target.name }}.weight.iter().collect();
-                entries.sort_by(|a, b| a.0.partial_cmp(b.0).unwrap());
-                for (k, v) in entries {
-                    let key = k.to_string();
-                    weight.insert(key, toml_edit::Value::from(round(*v, digits)));
-                }
-                t.insert("weight", toml_edit::Value::InlineTable(weight));
-
-                let mut scale = toml_edit::InlineTable::new();
-                let mut entries: Vec<_> = self.{{ target.name }}.scale.iter().collect();
-                entries.sort_by(|a, b| a.0.partial_cmp(b.0).unwrap());
-                for (k, v) in entries {
-                    let key = k.to_string();
-                    scale.insert(key, toml_edit::Value::from(round(*v, digits)));
-                }
-                t.insert("scale", toml_edit::Value::InlineTable(scale));
+        {%- if !loop.first %}
+        writeln!(&mut out).unwrap();
+        {%- endif %}
+        writeln!(&mut out, "    {{ target.name }}:").unwrap();
+        {%- match target.ty %}
+        {%- when dsl::Ty::Scalar %}
+        writeln!(
+            &mut out,
+            "      value: {v:.p$}",
+            v = round(self.{{ target.name }}.value, digits),
+            p = digits
+        )
+        .unwrap();
+        writeln!(
+            &mut out,
+            "      weight: {v:.1}",
+            v = round(self.{{ target.name }}.weight, 1)
+        )
+        .unwrap();
+        writeln!(
+            &mut out,
+            "      scale: {v:.p$}",
+            v = round_scale(self.{{ target.name }}.scale, digits),
+            p = digits
+        )
+        .unwrap();
+        {%- when dsl::Ty::Map(_) %}
+        for (label, map) in [
+            ("value", &self.{{ target.name }}.value),
+            ("weight", &self.{{ target.name }}.weight),
+            ("scale", &self.{{ target.name }}.scale),
+        ] {
+            if map.is_empty() {
+                writeln!(&mut out, "      {label}: {}", "{}").unwrap();
+                continue;
             }
-            {%- endmatch %}
-            table.insert(
-                "{{ target.name }}",
-                toml_edit::Item::Value(toml_edit::Value::InlineTable(t)),
-            );
+
+            writeln!(&mut out, "      {label}:").unwrap();
+            let mut entries: Vec<_> = map.iter().collect();
+            entries.sort_by(|a, b| a.0.partial_cmp(b.0).unwrap());
+            for (k, v) in entries {
+                writeln!(
+                    &mut out,
+                    "        {k}: {v:.p$}",
+                    k = k,
+                    v = if label == "weight" {
+                        round(*v, 1)
+                    } else if label == "scale" {
+                        round_scale(*v, digits)
+                    } else {
+                        round(*v, digits)
+                    },
+                    p = if label == "weight" { 1 } else { digits }
+                )
+                .unwrap();
+            }
         }
+        {%- endmatch %}
         {%- endfor %}
 
-        doc.insert("optimization.targets", toml_edit::Item::Table(table));
-        doc.to_string()
+        out
     }
 }

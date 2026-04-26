@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-# This script was AI generated, I'm too lazy to write it myself. It extracts keyboard layout presets from cyanophage's index.html and generates a presets.toml file.
+# This script was AI generated, I'm too lazy to write it myself. It extracts keyboard layout presets
+# from cyanophage's index.html and generates a presets.yaml file.
 
 from __future__ import annotations
 
@@ -210,28 +211,26 @@ def format_layout(preset: str) -> str:
     return "\n".join(rendered)
 
 
-def quote_key(key: str) -> str:
+def quote_yaml_key(key: str) -> str:
     if re.fullmatch(r"[A-Za-z0-9_-]+", key):
         return key
-    escaped = key.replace("\\", "\\\\").replace('"', '\\"')
-    return f'"{escaped}"'
-
-
-def quote_multiline(value: str) -> str:
-    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
-    return f'"""\n{escaped}\n"""'
+    escaped = key.replace("'", "''")
+    return f"'{escaped}'"
 
 
 def render_presets(entries: list[tuple[str, str]]) -> str:
     chunks: list[str] = []
     for name, preset in entries:
-        chunks.append(f"{quote_key(name)} = {quote_multiline(format_layout(preset))}\n")
-    return "\n".join(chunks)
+        chunks.append(f"{quote_yaml_key(name)}: |\n")
+        for line in format_layout(preset).splitlines():
+            chunks.append(f"  {line}\n")
+        chunks.append("\n")
+    return "".join(chunks).rstrip() + "\n"
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Generate presets.toml from cyanophage index.html",
+        description="Generate presets.yaml from cyanophage index.html",
     )
     parser.add_argument(
         "-i",
@@ -241,7 +240,7 @@ def main() -> int:
     parser.add_argument(
         "-o",
         "--output",
-        help="Output TOML file",
+        help="Output YAML file",
     )
     args = parser.parse_args()
 
