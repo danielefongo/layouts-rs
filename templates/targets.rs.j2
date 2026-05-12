@@ -18,12 +18,18 @@ pub struct Targets {
     {%- endfor %}
 }
 
+const HARD_LIMIT_PENALTY: f64 = 1_000_000.0;
+
 #[derive(Deserialize, Clone)]
 pub struct SingleTarget {
     pub value: f64,
     #[serde(default)]
     pub weight: f64,
     pub scale: f64,
+    #[serde(default)]
+    pub tolerance: f64,
+    #[serde(default)]
+    pub hard_limit: Option<f64>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -32,11 +38,34 @@ pub struct MapTarget<K: Hash + Eq> {
     #[serde(default = "IndexMap::new")]
     pub weight: IndexMap<K, f64>,
     pub scale: IndexMap<K, f64>,
+    #[serde(default = "IndexMap::new")]
+    pub tolerance: IndexMap<K, f64>,
+    #[serde(default = "IndexMap::new")]
+    pub hard_limit: IndexMap<K, f64>,
+}
+
+fn get_score(distance: f64, tolerance: f64, scale: f64, hard_limit: Option<f64>, weight: f64) -> f64 {
+    let distance = distance.abs();
+    let tolerance = tolerance.max(0.0);
+    let scale = scale.abs().max(f64::EPSILON);
+    let excess = (distance - tolerance).max(0.0);
+    let hard_penalty = match hard_limit {
+        Some(limit) if distance > limit.max(tolerance) => HARD_LIMIT_PENALTY,
+        _ => 0.0,
+    };
+
+    hard_penalty + weight * (excess / scale)
 }
 
 impl SingleTarget {
     pub fn score(&self, current_value: f64) -> f64 {
-        self.weight * ((current_value - self.value).abs() / self.scale)
+        get_score(
+            current_value - self.value,
+            self.tolerance,
+            self.scale,
+            self.hard_limit,
+            self.weight,
+        )
     }
 }
 
@@ -49,10 +78,12 @@ impl<K: Hash + Eq> MapTarget<K> {
                 let Some(target) = target else {
                     return 0.0;
                 };
-                let weight = self.weight.get(k).unwrap_or(&0.0);
-                let scale = self.scale.get(k).unwrap_or(&1.0);
+                let weight = *self.weight.get(k).unwrap_or(&0.0);
+                let scale = *self.scale.get(k).unwrap_or(&1.0);
+                let tolerance = *self.tolerance.get(k).unwrap_or(&0.0);
+                let hard_limit = self.hard_limit.get(k).copied();
 
-                weight * ((v - target).abs() / scale)
+                get_score(v - target, tolerance, scale, hard_limit, weight)
             })
             .sum()
     }
@@ -79,9 +110,9 @@ pub fn default_targets() -> Targets {
     Targets {
         {%- for target in targets %}
         {% if target.ty == dsl::Ty::Scalar %}
-        {{ target.name }}: SingleTarget { value: 0.0, weight: 0.0, scale: 1.0 },
+        {{ target.name }}: SingleTarget { value: 0.0, weight: 0.0, scale: 1.0, tolerance: 0.0, hard_limit: None },
         {%- else %}
-        {{ target.name }}: MapTarget { weight: IndexMap::new(), scale: IndexMap::new(), value: IndexMap::new() },
+        {{ target.name }}: MapTarget { weight: IndexMap::new(), scale: IndexMap::new(), value: IndexMap::new(), tolerance: IndexMap::new(), hard_limit: IndexMap::new() },
         {%- endif %}
         {%- endfor %}
     }

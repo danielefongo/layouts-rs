@@ -131,6 +131,8 @@ mod tests {
                     value: 0.0,
                     weight: 1.0,
                     scale: 1.0,
+                    tolerance: 0.0,
+                    hard_limit: None,
                 },
                 ..default_targets()
             },
