@@ -42,14 +42,9 @@ use indexmap::IndexMap;
 
 #[cfg_attr(test, mockall::automock)]
 pub trait MetricsCollector {
-    fn collect_metric(&mut self, metric: Metric);
-}
-
-#[derive(Debug, PartialEq)]
-pub enum Metric {
-    Trigram(Trigram, f64),
-    Bigram(Bigram, f64),
-    Unigram(Unigram, f64),
+    fn collect_unigram(&mut self, unigram: &Unigram, count: f64);
+    fn collect_bigram(&mut self, bigram: &Bigram, count: f64);
+    fn collect_trigram(&mut self, trigram: &Trigram, count: f64);
 }
 
 #[derive(Default)]
@@ -60,50 +55,54 @@ pub struct Metrics {
 }
 
 impl MetricsCollector for Metrics {
-    fn collect_metric(&mut self, metric: Metric) {
-        #[allow(unused_variables)]
-        #[allow(clippy::useless_conversion)]
-        match metric {
-            Metric::Unigram(unigram, count) => {
-                {% for metric in metrics %}{% if metric.category.is_unigram() %}
-                {% call collect_metric(metric) %}{% endcall %}
-                {% endif %}{% endfor %}
+    #[allow(unused_variables)]
+    #[allow(clippy::useless_conversion)]
+    fn collect_unigram(&mut self, unigram: &Unigram, count: f64) {
+        {% for metric in metrics %}{% if metric.category.is_unigram() %}
+        {% call collect_metric(metric) %}{% endcall %}
+        {% endif %}{% endfor %}
+    }
+
+    #[allow(unused_variables)]
+    #[allow(clippy::useless_conversion)]
+    fn collect_bigram(&mut self, bigram: &Bigram, count: f64) {
+        {% for metric in metrics %}{% if metric.category.is_bigram_no_kind() %}
+        {% call collect_metric(metric) %}{% endcall %}
+        {% endif %}{% endfor %}
+
+        bigram.for_each_kind(|kind| {
+            {% for metric in metrics %}{% if metric.category.is_bigram_kind("_") %}
+            {% call collect_metric(metric) %}{% endcall %}
+            {% endif %}{% endfor %}
+            match kind {
+                BigramKind::SameFingerSkip { units } => { {{ collect_bigram_metrics_kind("SameFingerSkip") }} }
+                BigramKind::LateralStretch { finger, units } => { {{ collect_bigram_metrics_kind("LateralStretch") }} }
+                BigramKind::Scissor { units, upper_finger, lower_finger, adiacent } => { {{ collect_bigram_metrics_kind("Scissor") }} }
+                BigramKind::Other => { {{ collect_bigram_metrics_kind("Other") }} }
             }
-            Metric::Bigram(bigram, count) => {
-                {% for metric in metrics %}{% if metric.category.is_bigram_no_kind() %}
-                {% call collect_metric(metric) %}{% endcall %}
-                {% endif %}{% endfor %}
-                for kind in bigram.kinds {
-                    {% for metric in metrics %}{% if metric.category.is_bigram_kind("_") %}
-                    {% call collect_metric(metric) %}{% endcall %}
-                    {% endif %}{% endfor %}
-                    match kind {
-                        BigramKind::SameFingerSkip { units } => { {{ collect_bigram_metrics_kind("SameFingerSkip") }} }
-                        BigramKind::LateralStretch { finger, units } => { {{ collect_bigram_metrics_kind("LateralStretch") }} }
-                        BigramKind::Scissor { units, upper_finger, lower_finger, adiacent } => { {{ collect_bigram_metrics_kind("Scissor") }} }
-                        BigramKind::Other => { {{ collect_bigram_metrics_kind("Other") }} }
-                    }
-                }
+        });
+    }
+
+    #[allow(unused_variables)]
+    #[allow(clippy::useless_conversion)]
+    fn collect_trigram(&mut self, trigram: &Trigram, count: f64) {
+        {% for metric in metrics %}{% if metric.category.is_trigram_no_kind() %}
+        {% call collect_metric(metric) %}{% endcall %}
+        {% endif %}{% endfor %}
+
+        trigram.for_each_kind(|kind| {
+            {% for metric in metrics %}{% if metric.category.is_trigram_kind("_") %}
+            {% call collect_metric(metric) %}{% endcall %}
+            {% endif %}{% endfor %}
+            match kind {
+                TrigramKind::SameFingerSkip { units, handedness } => { {{ collect_trigram_metrics_kind("SameFingerSkip") }} }
+                TrigramKind::Roll { length, direction } => { {{ collect_trigram_metrics_kind("Roll") }} }
+                TrigramKind::Redirect { strength } => { {{ collect_trigram_metrics_kind("Redirect") }} }
+                TrigramKind::Alternation => { {{ collect_trigram_metrics_kind("Alternation") }} }
+                TrigramKind::LateralStretch { handedness, finger, units } => { {{ collect_trigram_metrics_kind("LateralStretch") }} }
+                TrigramKind::Scissor { handedness, units, lower_finger, upper_finger, adiacent } => { {{ collect_trigram_metrics_kind("Scissor") }} }
+                TrigramKind::Other => { {{ collect_trigram_metrics_kind("Other") }} }
             }
-            Metric::Trigram(trigram, count) => {
-                {% for metric in metrics %}{% if metric.category.is_trigram_no_kind() %}
-                {% call collect_metric(metric) %}{% endcall %}
-                {% endif %}{% endfor %}
-                for kind in trigram.kinds {
-                    {% for metric in metrics %}{% if metric.category.is_trigram_kind("_") %}
-                    {% call collect_metric(metric) %}{% endcall %}
-                    {% endif %}{% endfor %}
-                    match kind {
-                        TrigramKind::SameFingerSkip { units, handedness } => { {{ collect_trigram_metrics_kind("SameFingerSkip") }} }
-                        TrigramKind::Roll { length, direction } => { {{ collect_trigram_metrics_kind("Roll") }} }
-                        TrigramKind::Redirect { strength } => { {{ collect_trigram_metrics_kind("Redirect") }} }
-                        TrigramKind::Alternation => { {{ collect_trigram_metrics_kind("Alternation") }} }
-                        TrigramKind::LateralStretch { handedness, finger, units } => { {{ collect_trigram_metrics_kind("LateralStretch") }} }
-                        TrigramKind::Scissor { handedness, units, lower_finger, upper_finger, adiacent } => { {{ collect_trigram_metrics_kind("Scissor") }} }
-                        TrigramKind::Other => { {{ collect_trigram_metrics_kind("Other") }} }
-                    }
-                }
-            }
-        }
+        });
     }
 }

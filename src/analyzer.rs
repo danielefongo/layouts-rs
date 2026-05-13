@@ -5,7 +5,7 @@ use derive_more::Constructor;
 use crate::{
     corpus::Corpus,
     layout::{Key, Layout},
-    metrics::{Metric, MetricsCollector},
+    metrics::MetricsCollector,
     ngrams::{Bigram, Trigram, Unigram},
 };
 
@@ -59,7 +59,7 @@ impl Analyzer {
                 continue;
             };
 
-            metrics.collect_metric(Metric::Unigram(Unigram::new(key), *count));
+            metrics.collect_unigram(&Unigram::new(key), *count);
         }
 
         for ((char1, char2), count) in self.corpus.bigrams.iter() {
@@ -67,7 +67,7 @@ impl Analyzer {
                 continue;
             };
 
-            metrics.collect_metric(Metric::Bigram(Bigram::new(key1, key2), *count));
+            metrics.collect_bigram(&Bigram::new(key1, key2), *count);
         }
 
         for ((char1, char2, char3), count) in self.corpus.trigrams.iter() {
@@ -79,7 +79,7 @@ impl Analyzer {
                 continue;
             };
 
-            metrics.collect_metric(Metric::Trigram(Trigram::new(key1, key2, key3), *count));
+            metrics.collect_trigram(&Trigram::new(key1, key2, key3), *count);
         }
     }
 }
@@ -120,21 +120,24 @@ mod tests {
         };
 
         let key = qwerty.key_for('a').unwrap();
+        let unigram = Unigram::new(key);
+        let bigram = Bigram::new(key, key);
+        let trigram = Trigram::new(key, key, key);
 
         let mut metrics = MockMetricsCollector::new();
         metrics
-            .expect_collect_metric()
-            .with(eq(Metric::Unigram(Unigram::new(key), 1.0)))
+            .expect_collect_unigram()
+            .with(eq(unigram), eq(1.0))
             .once()
             .return_const(());
         metrics
-            .expect_collect_metric()
-            .with(eq(Metric::Bigram(Bigram::new(key, key), 2.0)))
+            .expect_collect_bigram()
+            .with(eq(bigram), eq(2.0))
             .once()
             .return_const(());
         metrics
-            .expect_collect_metric()
-            .with(eq(Metric::Trigram(Trigram::new(key, key, key), 3.0)))
+            .expect_collect_trigram()
+            .with(eq(trigram), eq(3.0))
             .once()
             .return_const(());
 
@@ -153,18 +156,16 @@ mod tests {
         }
 
         impl MetricsCollector for FakeMetricsCollector {
-            fn collect_metric(&mut self, metric: Metric) {
-                match metric {
-                    Metric::Unigram(_, count) => {
-                        self.unigrams += count;
-                    }
-                    Metric::Bigram(_, count) => {
-                        self.bigrams += count;
-                    }
-                    Metric::Trigram(_, count) => {
-                        self.trigrams += count;
-                    }
-                }
+            fn collect_unigram(&mut self, _unigram: &Unigram, count: f64) {
+                self.unigrams += count;
+            }
+
+            fn collect_bigram(&mut self, _bigram: &Bigram, count: f64) {
+                self.bigrams += count;
+            }
+
+            fn collect_trigram(&mut self, _trigram: &Trigram, count: f64) {
+                self.trigrams += count;
             }
         }
 
