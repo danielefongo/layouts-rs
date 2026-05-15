@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
 
@@ -19,6 +19,29 @@ pub use hill_climb::*;
 pub use simulated_annealing::*;
 
 const MAX_PERTURB_ATTEMPTS: usize = 30;
+
+pub struct LayoutScores {
+    scores: HashMap<u64, f64>,
+}
+
+impl LayoutScores {
+    pub fn new() -> Self {
+        Self {
+            scores: HashMap::new(),
+        }
+    }
+
+    pub fn get_or_compute(&mut self, layout: &Layout, score_fn: impl Fn(&Layout) -> f64) -> f64 {
+        let hash = layout.hash();
+        if let Some(score) = self.scores.get(&hash) {
+            *score
+        } else {
+            let score = score_fn(layout);
+            self.scores.insert(hash, score);
+            score
+        }
+    }
+}
 
 #[derive(Clone)]
 struct OptimizableLayout {
@@ -191,35 +214,83 @@ pub trait Optimizer {
 }
 
 #[cfg(test)]
+mod layout_scores_tests {
+    use std::cell::Cell;
+
+    use assert2::check;
+
+    use super::*;
+
+    #[test]
+    fn it_computes_score_when_layout_is_not_cached() {
+        let layout = make_layout();
+        let calls = Cell::new(0);
+        let mut scores = LayoutScores::new();
+
+        let score = scores.get_or_compute(&layout, |_| {
+            calls.set(calls.get() + 1);
+            42.0
+        });
+
+        check!(score == 42.0);
+        check!(calls.get() == 1);
+    }
+
+    #[test]
+    fn it_reuses_cached_score_for_same_layout() {
+        let layout = make_layout();
+        let calls = Cell::new(0);
+        let mut scores = LayoutScores::new();
+
+        let first = scores.get_or_compute(&layout, |_| {
+            calls.set(calls.get() + 1);
+            42.0
+        });
+        let second = scores.get_or_compute(&layout, |_| {
+            calls.set(calls.get() + 1);
+            13.0
+        });
+
+        check!(first == 42.0);
+        check!(second == 42.0);
+        check!(calls.get() == 1);
+    }
+
+    #[test]
+    fn it_computes_separate_scores_for_different_layouts() {
+        let layout = make_layout();
+        let mut swapped = layout.clone();
+        swapped.swap_chars(&pos!(0, 0), &pos!(1, 1));
+        let calls = Cell::new(0);
+        let mut scores = LayoutScores::new();
+
+        let first = scores.get_or_compute(&layout, |_| {
+            calls.set(calls.get() + 1);
+            42.0
+        });
+        let second = scores.get_or_compute(&swapped, |_| {
+            calls.set(calls.get() + 1);
+            13.0
+        });
+
+        check!(first == 42.0);
+        check!(second == 13.0);
+        check!(calls.get() == 2);
+    }
+}
+
+#[cfg(test)]
 mod optimizable_layout_tests {
     use assert2::check;
     use rand::rng;
 
     use super::*;
-    use crate::layout::Config;
 
     const STRATEGIES: &[(SwapMoveStrategy, usize); 3] = &[
         (SwapMoveStrategy::Single, 20),
         (SwapMoveStrategy::Column, 1),
         (SwapMoveStrategy::Row, 1),
     ];
-
-    fn make_layout() -> Layout {
-        Layout::new(
-            "ab\ncd",
-            &Config {
-                key_size: key_size!(1.0, 1.0),
-                key_centers: matrix!([
-                    [coords!(0.0, 0.0), coords!(0.0, 1.0)],
-                    [coords!(1.0, 0.0), coords!(1.0, 1.0)]
-                ]),
-                finger_assignment: matrix!(fingers, [[1, 2], [1, 2]]),
-                finger_effort: matrix!([[1.0, 50.0], [100.0, 200.0]]),
-                finger_home_positions: [(finger!(1), pos!(0, 0)), (finger!(2), pos!(0, 1))].into(),
-            },
-        )
-        .unwrap()
-    }
 
     #[test]
     fn it_does_not_improve_layout_when_no_swap_gives_better_score() {
@@ -470,4 +541,22 @@ mod optimizable_layout_tests {
     fn layout_effort_score(layout: &Layout) -> f64 {
         layout.keys().map(|k| k.effort).sum()
     }
+}
+
+#[cfg(test)]
+fn make_layout() -> Layout {
+    Layout::new(
+        "ab\ncd",
+        &crate::layout::Config {
+            key_size: key_size!(1.0, 1.0),
+            key_centers: matrix!([
+                [coords!(0.0, 0.0), coords!(0.0, 1.0)],
+                [coords!(1.0, 0.0), coords!(1.0, 1.0)]
+            ]),
+            finger_assignment: matrix!(fingers, [[1, 2], [1, 2]]),
+            finger_effort: matrix!([[1.0, 50.0], [100.0, 200.0]]),
+            finger_home_positions: [(finger!(1), pos!(0, 0)), (finger!(2), pos!(0, 1))].into(),
+        },
+    )
+    .unwrap()
 }

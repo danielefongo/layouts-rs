@@ -8,7 +8,7 @@ use crate::{
     analyzer::Analyzer,
     layout::Layout,
     metrics::Metrics,
-    optimizer::{OptimizableLayout, Optimizer, RunOptions},
+    optimizer::{LayoutScores, OptimizableLayout, Optimizer, RunOptions},
     stats::Stats,
     swaps::SwapMoveBuilder,
     targets::Targets,
@@ -45,7 +45,9 @@ impl Optimizer for HillClimbOptimizer {
             best_layout.shuffle(&mut rng);
         }
 
-        let mut best_score = self.score(&best_layout.layout);
+        let mut scores = LayoutScores::new();
+        let mut best_score =
+            scores.get_or_compute(&best_layout.layout, |layout| self.score(layout));
 
         debug!("Layout score {}", best_score);
 
@@ -58,15 +60,15 @@ impl Optimizer for HillClimbOptimizer {
 
             let mut best_candidate = candidate.clone();
 
-            let mut current_score = self.score(&candidate.layout);
+            let mut current_score =
+                scores.get_or_compute(&candidate.layout, |layout| self.score(layout));
 
             let mut tabu_list: HashSet<u64> = HashSet::new();
 
             let mut step = 0;
-            while let Some(best_iteration_score) = candidate.try_improve(&tabu_list, |layout| {
-                let score = self.score(layout);
-                Some(score)
-            }) {
+            while let Some(best_iteration_score) =
+                candidate.try_improve(&tabu_list, |layout| Some(self.score(layout)))
+            {
                 tabu_list.insert(candidate.layout.hash());
 
                 if best_iteration_score < current_score {

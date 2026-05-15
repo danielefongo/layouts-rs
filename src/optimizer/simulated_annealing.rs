@@ -8,7 +8,7 @@ use crate::{
     analyzer::Analyzer,
     layout::Layout,
     metrics::Metrics,
-    optimizer::{OptimizableLayout, Optimizer, RunOptions},
+    optimizer::{LayoutScores, OptimizableLayout, Optimizer, RunOptions},
     stats::Stats,
     swaps::{SwapMoveBuilder, SwapMoveStrategy},
     targets::Targets,
@@ -67,7 +67,9 @@ impl Optimizer for SimulatedAnnealingOptimizer {
             best_layout.shuffle(&mut rng);
         }
 
-        let mut best_score = self.score(&best_layout.layout);
+        let mut scores = LayoutScores::new();
+        let mut best_score =
+            scores.get_or_compute(&best_layout.layout, |layout| self.score(layout));
         let mut current = best_layout.clone();
         let mut current_score = best_score;
 
@@ -86,7 +88,8 @@ impl Optimizer for SimulatedAnnealingOptimizer {
                 &[(SwapMoveStrategy::Single, 1)],
             );
 
-            let candidate_score = self.score(&candidate.layout);
+            let candidate_score =
+                scores.get_or_compute(&candidate.layout, |layout| self.score(layout));
             let delta = candidate_score - current_score;
 
             let accept = if delta <= 0.0 {
