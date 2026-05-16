@@ -37,7 +37,6 @@ optimization:
   simulated_annealing:
     init_temp: 150.0
     cooling: 0.998
-    key_switches: 2
     stall_accepted: 5000
 
   # If the field weight is not set, the metric wont be optimized

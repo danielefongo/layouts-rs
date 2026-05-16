@@ -18,7 +18,6 @@ use crate::{
 pub struct SimulatedAnnealingConfig {
     pub init_temp: f64,
     pub cooling: f64,
-    pub key_switches: usize,
     pub stall_accepted: usize,
 }
 
@@ -28,7 +27,6 @@ pub struct SimulatedAnnealingOptimizer {
     init_temp: f64,
     cooling: f64,
     stall_accepted: usize,
-    key_switches: usize,
 }
 
 impl SimulatedAnnealingOptimizer {
@@ -39,7 +37,6 @@ impl SimulatedAnnealingOptimizer {
             init_temp: config.init_temp,
             cooling: config.cooling,
             stall_accepted: config.stall_accepted,
-            key_switches: config.key_switches.max(1),
         }
     }
 
@@ -84,8 +81,11 @@ impl Optimizer for SimulatedAnnealingOptimizer {
             let mut candidate = current.clone();
             candidate.perturb(
                 &mut rng,
-                self.key_switches,
-                &[(SwapMoveStrategy::Single, 1)],
+                1,
+                &[
+                    (SwapMoveStrategy::Single, 10),
+                    (SwapMoveStrategy::ThreeCycle, 1),
+                ],
             );
 
             let candidate_score =
@@ -175,7 +175,6 @@ mod tests {
                 ..default_targets()
             },
             SimulatedAnnealingConfig {
-                key_switches: 2,
                 init_temp: 100.0,
                 cooling: 0.95,
                 stall_accepted: 100,

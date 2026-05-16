@@ -20,6 +20,7 @@ pub use simulated_annealing::*;
 
 const MAX_PERTURB_ATTEMPTS: usize = 30;
 
+#[derive(Default)]
 pub struct LayoutScores {
     scores: HashMap<u64, f64>,
 }
