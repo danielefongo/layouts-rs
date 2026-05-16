@@ -10,7 +10,7 @@ use crate::{
     metrics::Metrics,
     optimizer::{LayoutScores, OptimizableLayout, Optimizer, RunOptions},
     stats::Stats,
-    swaps::SwapMoveBuilder,
+    swaps::{SwapMoveBuilder, SwapMoveStrategy},
     targets::Targets,
 };
 
@@ -38,7 +38,11 @@ impl Optimizer for HillClimbOptimizer {
             layout.clone(),
             opts.pinned,
             opts.max_swapped,
-            SwapMoveBuilder::full(),
+            SwapMoveBuilder::new(&[
+                SwapMoveStrategy::Single,
+                SwapMoveStrategy::Column,
+                SwapMoveStrategy::Row,
+            ]),
         );
 
         if opts.shuffle {

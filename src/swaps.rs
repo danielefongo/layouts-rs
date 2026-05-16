@@ -17,6 +17,7 @@ pub enum SwapMoveStrategy {
     Single,
     Column,
     Row,
+    ThreeCycle,
 }
 
 #[derive(Default)]
@@ -30,6 +31,7 @@ impl SwapMoveBuilder {
             SwapMoveStrategy::Single,
             SwapMoveStrategy::Column,
             SwapMoveStrategy::Row,
+            SwapMoveStrategy::ThreeCycle,
         ])
     }
 
@@ -55,6 +57,7 @@ impl SwapMoveBuilder {
                 SwapMoveStrategy::Single => Self::single_moves(positions),
                 SwapMoveStrategy::Column => Self::column_moves(positions),
                 SwapMoveStrategy::Row => Self::row_moves(positions),
+                SwapMoveStrategy::ThreeCycle => Self::three_cycle_moves(positions),
             };
 
             if !moves.is_empty() {
@@ -71,6 +74,19 @@ impl SwapMoveBuilder {
         for (i, &p1) in positions.iter().enumerate() {
             for &p2 in positions.iter().skip(i + 1) {
                 moves.push(SwapMove(vec![(p1, p2)]));
+            }
+        }
+        moves
+    }
+
+    fn three_cycle_moves(positions: &[Pos]) -> Vec<SwapMove> {
+        let mut moves = Vec::new();
+        for (i, &a) in positions.iter().enumerate() {
+            for (j, &b) in positions.iter().enumerate().skip(i + 1) {
+                for &c in positions.iter().skip(j + 1) {
+                    moves.push(SwapMove(vec![(a, c), (b, c)]));
+                    moves.push(SwapMove(vec![(a, b), (c, b)]));
+                }
             }
         }
         moves
@@ -192,10 +208,47 @@ impl SwapMove {
 }
 
 #[cfg(test)]
-mod single_moves_tests {
+mod swap_move_tests {
     use assert2::check;
 
     use crate::layout::Config;
+
+    use super::*;
+
+    fn layout() -> Layout {
+        Layout::new(
+            "ab\ncd",
+            &Config {
+                key_size: key_size!(1.0, 1.0),
+                key_centers: matrix!([
+                    [coords!(0.0, 0.0), coords!(0.0, 1.0)],
+                    [coords!(1.0, 0.0), coords!(1.0, 1.0)]
+                ]),
+                finger_assignment: matrix!(fingers, [[1, 2], [1, 2]]),
+                finger_effort: matrix!([[1.0, 2.0], [3.0, 4.0]]),
+                finger_home_positions: [(finger!(1), pos!(0, 0)), (finger!(2), pos!(0, 1))].into(),
+            },
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn it_applies_all_swaps_in_order() {
+        let mut layout = layout();
+        let swap = SwapMove(vec![(pos!(0, 0), pos!(0, 1)), (pos!(1, 0), pos!(0, 1))]);
+
+        swap.apply(&mut layout);
+
+        check!(layout.key_for('a').unwrap().position == pos!(1, 0));
+        check!(layout.key_for('b').unwrap().position == pos!(0, 0));
+        check!(layout.key_for('c').unwrap().position == pos!(0, 1));
+        check!(layout.key_for('d').unwrap().position == pos!(1, 1));
+    }
+}
+
+#[cfg(test)]
+mod single_moves_tests {
+    use assert2::check;
 
     use super::*;
 
@@ -224,63 +277,38 @@ mod single_moves_tests {
         let swap_moves = SwapMoveBuilder::new(&[SwapMoveStrategy::Single]).build(&[]);
         check!(swap_moves.is_empty());
     }
+}
+
+#[cfg(test)]
+mod three_cycle_moves_tests {
+    use assert2::check;
+
+    use super::*;
 
     #[test]
-    fn it_applies() {
-        let mut layout = Layout::new(
-            "ab\ncd",
-            &Config {
-                key_size: key_size!(1.0, 1.0),
-                key_centers: matrix!([
-                    [coords!(0.0, 0.0), coords!(0.0, 1.0)],
-                    [coords!(1.0, 0.0), coords!(1.0, 1.0)]
-                ]),
-                finger_assignment: matrix!(fingers, [[1, 2], [1, 2]]),
-                finger_effort: matrix!([[1.0, 2.0], [3.0, 4.0]]),
-                finger_home_positions: [(finger!(1), pos!(0, 0)), (finger!(2), pos!(0, 1))].into(),
-            },
-        )
-        .unwrap();
-
-        let swap = SwapMove(vec![(pos!(0, 0), pos!(1, 0))]);
-        swap.apply(&mut layout);
-
-        check!(layout.key_for('a').unwrap().position == pos!(1, 0));
-        check!(layout.key_for('c').unwrap().position == pos!(0, 0));
+    fn it_builds() {
+        let positions = vec![pos!(0, 0), pos!(1, 0), pos!(0, 1)];
+        let cycle_moves = SwapMoveBuilder::new(&[SwapMoveStrategy::ThreeCycle]).build(&positions);
+        check!(
+            cycle_moves.moves()
+                == vec![
+                    &SwapMove(vec![(pos!(0, 0), pos!(0, 1)), (pos!(1, 0), pos!(0, 1))]),
+                    &SwapMove(vec![(pos!(0, 0), pos!(1, 0)), (pos!(0, 1), pos!(1, 0))]),
+                ]
+        );
     }
 
     #[test]
-    fn it_reverts_when_applied_twice() {
-        let original = Layout::new(
-            "ab\ncd",
-            &Config {
-                key_size: key_size!(1.0, 1.0),
-                key_centers: matrix!([
-                    [coords!(0.0, 0.0), coords!(0.0, 1.0)],
-                    [coords!(1.0, 0.0), coords!(1.0, 1.0)]
-                ]),
-                finger_assignment: matrix!(fingers, [[1, 2], [1, 2]]),
-                finger_effort: matrix!([[1.0, 2.0], [3.0, 4.0]]),
-                finger_home_positions: [(finger!(1), pos!(0, 0)), (finger!(2), pos!(0, 1))].into(),
-            },
-        )
-        .unwrap();
-
-        let mut layout = original;
-        let swap = SwapMove(vec![(pos!(0, 0), pos!(1, 0))]);
-        swap.apply(&mut layout);
-        swap.apply(&mut layout);
-
-        check!(layout.key_for('a').unwrap().position == pos!(0, 0));
-        check!(layout.key_for('c').unwrap().position == pos!(1, 0));
+    fn it_builds_from_two_positions() {
+        let cycle_moves =
+            SwapMoveBuilder::new(&[SwapMoveStrategy::ThreeCycle]).build(&[pos!(0, 0), pos!(1, 0)]);
+        check!(cycle_moves.is_empty());
     }
 }
 
 #[cfg(test)]
 mod column_moves_tests {
     use assert2::check;
-
-    use crate::layout::Config;
 
     use super::*;
 
@@ -364,67 +392,11 @@ mod column_moves_tests {
         let col_moves = SwapMoveBuilder::new(&[SwapMoveStrategy::Column]).build(&[]);
         check!(col_moves.is_empty());
     }
-
-    #[test]
-    fn it_applies() {
-        let mut layout = Layout::new(
-            "ab\ncd",
-            &Config {
-                key_size: key_size!(1.0, 1.0),
-                key_centers: matrix!([
-                    [coords!(0.0, 0.0), coords!(0.0, 1.0)],
-                    [coords!(1.0, 0.0), coords!(1.0, 1.0)]
-                ]),
-                finger_assignment: matrix!(fingers, [[1, 2], [1, 2]]),
-                finger_effort: matrix!([[1.0, 2.0], [3.0, 4.0]]),
-                finger_home_positions: [(finger!(1), pos!(0, 0)), (finger!(2), pos!(0, 1))].into(),
-            },
-        )
-        .unwrap();
-
-        let swap = SwapMove(vec![(pos!(0, 0), pos!(0, 1)), (pos!(1, 0), pos!(1, 1))]);
-        swap.apply(&mut layout);
-
-        check!(layout.key_for('a').unwrap().position == pos!(0, 1));
-        check!(layout.key_for('b').unwrap().position == pos!(0, 0));
-        check!(layout.key_for('c').unwrap().position == pos!(1, 1));
-        check!(layout.key_for('d').unwrap().position == pos!(1, 0));
-    }
-
-    #[test]
-    fn it_reverts_when_applied_twice() {
-        let original = Layout::new(
-            "ab\ncd",
-            &Config {
-                key_size: key_size!(1.0, 1.0),
-                key_centers: matrix!([
-                    [coords!(0.0, 0.0), coords!(0.0, 1.0)],
-                    [coords!(1.0, 0.0), coords!(1.0, 1.0)]
-                ]),
-                finger_assignment: matrix!(fingers, [[1, 2], [1, 2]]),
-                finger_effort: matrix!([[1.0, 2.0], [3.0, 4.0]]),
-                finger_home_positions: [(finger!(1), pos!(0, 0)), (finger!(2), pos!(0, 1))].into(),
-            },
-        )
-        .unwrap();
-
-        let mut layout = original;
-        let swap = SwapMove(vec![(pos!(0, 0), pos!(0, 1)), (pos!(1, 0), pos!(1, 1))]);
-        swap.apply(&mut layout);
-        swap.apply(&mut layout);
-
-        check!(layout.key_for('a').unwrap().position == pos!(0, 0));
-        check!(layout.key_for('b').unwrap().position == pos!(0, 1));
-        check!(layout.key_for('c').unwrap().position == pos!(1, 0));
-        check!(layout.key_for('d').unwrap().position == pos!(1, 1));
-    }
 }
 
 #[cfg(test)]
 mod row_moves_tests {
     use assert2::check;
-
-    use crate::layout::Config;
 
     use super::*;
 
@@ -507,59 +479,5 @@ mod row_moves_tests {
     fn it_builds_from_empty() {
         let row_moves = SwapMoveBuilder::new(&[SwapMoveStrategy::Row]).build(&[]);
         check!(row_moves.is_empty());
-    }
-
-    #[test]
-    fn it_applies() {
-        let mut layout = Layout::new(
-            "ab\ncd",
-            &Config {
-                key_size: key_size!(1.0, 1.0),
-                key_centers: matrix!([
-                    [coords!(0.0, 0.0), coords!(0.0, 1.0)],
-                    [coords!(1.0, 0.0), coords!(1.0, 1.0)]
-                ]),
-                finger_assignment: matrix!(fingers, [[1, 2], [1, 2]]),
-                finger_effort: matrix!([[1.0, 2.0], [3.0, 4.0]]),
-                finger_home_positions: [(finger!(1), pos!(0, 0)), (finger!(2), pos!(0, 1))].into(),
-            },
-        )
-        .unwrap();
-
-        let swap = SwapMove(vec![(pos!(0, 0), pos!(1, 0)), (pos!(0, 1), pos!(1, 1))]);
-        swap.apply(&mut layout);
-
-        check!(layout.key_for('a').unwrap().position == pos!(1, 0));
-        check!(layout.key_for('b').unwrap().position == pos!(1, 1));
-        check!(layout.key_for('c').unwrap().position == pos!(0, 0));
-        check!(layout.key_for('d').unwrap().position == pos!(0, 1));
-    }
-
-    #[test]
-    fn it_reverts_when_applied_twice() {
-        let original = Layout::new(
-            "ab\ncd",
-            &Config {
-                key_size: key_size!(1.0, 1.0),
-                key_centers: matrix!([
-                    [coords!(0.0, 0.0), coords!(0.0, 1.0)],
-                    [coords!(1.0, 0.0), coords!(1.0, 1.0)]
-                ]),
-                finger_assignment: matrix!(fingers, [[1, 2], [1, 2]]),
-                finger_effort: matrix!([[1.0, 2.0], [3.0, 4.0]]),
-                finger_home_positions: [(finger!(1), pos!(0, 0)), (finger!(2), pos!(0, 1))].into(),
-            },
-        )
-        .unwrap();
-
-        let mut layout = original;
-        let swap = SwapMove(vec![(pos!(0, 0), pos!(1, 0)), (pos!(0, 1), pos!(1, 1))]);
-        swap.apply(&mut layout);
-        swap.apply(&mut layout);
-
-        check!(layout.key_for('a').unwrap().position == pos!(0, 0));
-        check!(layout.key_for('b').unwrap().position == pos!(0, 1));
-        check!(layout.key_for('c').unwrap().position == pos!(1, 0));
-        check!(layout.key_for('d').unwrap().position == pos!(1, 1));
     }
 }
