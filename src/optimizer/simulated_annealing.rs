@@ -172,7 +172,6 @@ mod tests {
                     tolerance: 0.0,
                     hard_limit: None,
                 },
-                ..default_targets()
             },
             SimulatedAnnealingConfig {
                 init_temp: 100.0,

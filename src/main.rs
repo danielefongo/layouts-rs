@@ -10,7 +10,7 @@ use layouts_rs::{
     layout::Layout,
     metrics::Metrics,
     optimizer::{self, HillClimbOptimizer, Optimizer, SimulatedAnnealingOptimizer},
-    stats::{Stats, StatsDiff},
+    stats::Stats,
 };
 use rand::{Rng, rng};
 
@@ -230,7 +230,10 @@ impl Command {
 
                 let score = stats_after.score(&config.optimization.targets);
 
-                let diff = StatsDiff::diff(stats_after, stats_before, config.optimization.targets);
+                let diff = config
+                    .optimization
+                    .targets
+                    .make_diff(stats_before, stats_after);
 
                 info!("Optimized Layout:\n{optimized_layout}");
                 info!("Optimization score: {score:.4}");
