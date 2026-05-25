@@ -41,31 +41,61 @@ pub enum RedirectStrength {
     Strong,
 }
 
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub struct SameFingerSkip {
+    pub units: u8,
+}
+
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub struct LateralStretch {
+    pub finger: FingerKind,
+    pub units: u8,
+}
+
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub struct Scissor {
+    pub units: u8,
+    pub upper_finger: FingerKind,
+    pub lower_finger: FingerKind,
+    pub adiacent: bool,
+}
+
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub struct TrigramSameFingerSkip {
+    pub skip: SameFingerSkip,
+    pub handedness: Handedness,
+}
+
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub struct TrigramLateralStretch {
+    pub stretch: LateralStretch,
+    pub handedness: Handedness,
+}
+
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub struct TrigramScissor {
+    pub scissor: Scissor,
+    pub handedness: Handedness,
+}
+
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub struct Roll {
+    pub length: u8,
+    pub direction: RollDirection,
+}
+
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub struct Redirect {
+    pub strength: RedirectStrength,
+}
+
 #[derive(PartialEq, Debug, Clone)]
 pub enum TrigramKind {
-    SameFingerSkip {
-        units: u8,
-        handedness: Handedness,
-    },
-    LateralStretch {
-        finger: FingerKind,
-        units: u8,
-        handedness: Handedness,
-    },
-    Scissor {
-        units: u8,
-        upper_finger: FingerKind,
-        lower_finger: FingerKind,
-        handedness: Handedness,
-        adiacent: bool,
-    },
-    Roll {
-        length: u8,
-        direction: RollDirection,
-    },
-    Redirect {
-        strength: RedirectStrength,
-    },
+    SameFingerSkip(TrigramSameFingerSkip),
+    LateralStretch(TrigramLateralStretch),
+    Scissor(TrigramScissor),
+    Roll(Roll),
+    Redirect(Redirect),
     Alternation,
     Other,
 }
@@ -92,32 +122,26 @@ impl Trigram {
             };
 
             bigram.for_each_kind(|kind| match kind {
-                BigramKind::SameFingerSkip { units } => {
+                BigramKind::SameFingerSkip(skip) => {
                     emitted = true;
-                    visitor(TrigramKind::SameFingerSkip { units, handedness });
-                }
-                BigramKind::LateralStretch { finger, units } => {
-                    emitted = true;
-                    visitor(TrigramKind::LateralStretch {
-                        finger,
-                        units,
+                    visitor(TrigramKind::SameFingerSkip(TrigramSameFingerSkip {
+                        skip,
                         handedness,
-                    });
+                    }));
                 }
-                BigramKind::Scissor {
-                    units,
-                    upper_finger,
-                    lower_finger,
-                    adiacent,
-                } => {
+                BigramKind::LateralStretch(stretch) => {
                     emitted = true;
-                    visitor(TrigramKind::Scissor {
-                        units,
-                        upper_finger,
-                        lower_finger,
+                    visitor(TrigramKind::LateralStretch(TrigramLateralStretch {
+                        stretch,
                         handedness,
-                        adiacent,
-                    });
+                    }));
+                }
+                BigramKind::Scissor(scissor) => {
+                    emitted = true;
+                    visitor(TrigramKind::Scissor(TrigramScissor {
+                        scissor,
+                        handedness,
+                    }));
                 }
                 BigramKind::Other => {}
             });
@@ -128,17 +152,17 @@ impl Trigram {
         {
             if self.key1.finger < self.key2.finger && self.key2.finger < self.key3.finger {
                 emitted = true;
-                visitor(TrigramKind::Roll {
+                visitor(TrigramKind::Roll(Roll {
                     length: 3,
                     direction: RollDirection::In,
-                });
+                }));
             }
             if self.key1.finger > self.key2.finger && self.key2.finger > self.key3.finger {
                 emitted = true;
-                visitor(TrigramKind::Roll {
+                visitor(TrigramKind::Roll(Roll {
                     length: 3,
                     direction: RollDirection::Out,
-                });
+                }));
             }
 
             if (self.key1.finger < self.key2.finger && self.key3.finger < self.key2.finger
@@ -150,13 +174,13 @@ impl Trigram {
                     && ![FingerKind::Thumb, FingerKind::Index].contains(&self.key2.finger.kind)
                     && ![FingerKind::Thumb, FingerKind::Index].contains(&self.key3.finger.kind)
                 {
-                    visitor(TrigramKind::Redirect {
+                    visitor(TrigramKind::Redirect(Redirect {
                         strength: RedirectStrength::Weak,
-                    });
+                    }));
                 } else {
-                    visitor(TrigramKind::Redirect {
+                    visitor(TrigramKind::Redirect(Redirect {
                         strength: RedirectStrength::Strong,
-                    });
+                    }));
                 }
             }
         }
@@ -166,17 +190,17 @@ impl Trigram {
         {
             if self.key1.finger < self.key2.finger {
                 emitted = true;
-                visitor(TrigramKind::Roll {
+                visitor(TrigramKind::Roll(Roll {
                     length: 2,
                     direction: RollDirection::In,
-                });
+                }));
             }
             if self.key1.finger > self.key2.finger {
                 emitted = true;
-                visitor(TrigramKind::Roll {
+                visitor(TrigramKind::Roll(Roll {
                     length: 2,
                     direction: RollDirection::Out,
-                });
+                }));
             }
         }
 
@@ -202,19 +226,9 @@ pub struct Bigram {
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum BigramKind {
-    SameFingerSkip {
-        units: u8,
-    },
-    LateralStretch {
-        finger: FingerKind,
-        units: u8,
-    },
-    Scissor {
-        units: u8,
-        upper_finger: FingerKind,
-        lower_finger: FingerKind,
-        adiacent: bool,
-    },
+    SameFingerSkip(SameFingerSkip),
+    LateralStretch(LateralStretch),
+    Scissor(Scissor),
     Other,
 }
 
@@ -240,9 +254,9 @@ impl Bigram {
 
         if self.key1.same_finger(&self.key2) && (row_distance > 0.0 || col_distance > 0.0) {
             emitted = true;
-            visitor(BigramKind::SameFingerSkip {
+            visitor(BigramKind::SameFingerSkip(SameFingerSkip {
                 units: self.key1.distance(&self.key2) as u8,
-            });
+            }));
         }
 
         // This differ from doc definition (which uses 2.0 for adiacent keys and 3.5 for non
@@ -253,18 +267,18 @@ impl Bigram {
         {
             if LATERAL_STRETCH_PAIRS.contains(&(self.key1.finger.kind, self.key2.finger.kind)) {
                 emitted = true;
-                visitor(BigramKind::LateralStretch {
+                visitor(BigramKind::LateralStretch(LateralStretch {
                     finger: self.key1.finger.kind,
                     units: col_distance as u8,
-                });
+                }));
             }
 
             if LATERAL_STRETCH_PAIRS.contains(&(self.key2.finger.kind, self.key1.finger.kind)) {
                 emitted = true;
-                visitor(BigramKind::LateralStretch {
+                visitor(BigramKind::LateralStretch(LateralStretch {
                     finger: self.key2.finger.kind,
                     units: col_distance as u8,
-                });
+                }));
             }
         }
 
@@ -279,12 +293,12 @@ impl Bigram {
             };
 
             emitted = true;
-            visitor(BigramKind::Scissor {
+            visitor(BigramKind::Scissor(Scissor {
                 units: row_distance as u8,
                 upper_finger: upper.finger.kind,
                 lower_finger: lower.finger.kind,
                 adiacent: finger_distance == 1,
-            });
+            }));
         }
 
         if !emitted {
@@ -330,15 +344,15 @@ mod bigram_tests {
     }
 
     #[rstest]
-    #[case::left_1_vertical('q', 'a', vec![BigramKind::SameFingerSkip { units: 1 }])]
-    #[case::left_2_vertical('q', 'z', vec![BigramKind::SameFingerSkip { units: 2 }])]
-    #[case::left_1_lateral('f', 'g', vec![BigramKind::SameFingerSkip { units: 1 }])]
-    #[case::left_1_diagonal('f', 'b', vec![BigramKind::SameFingerSkip { units: 1 }])]
-    #[case::left_2_diagonal('r', 'b', vec![BigramKind::SameFingerSkip { units: 2 }])]
-    #[case::right_1_vertical('u', 'j', vec![BigramKind::SameFingerSkip { units: 1 }])]
-    #[case::right_2_vertical('y', 'n', vec![BigramKind::SameFingerSkip { units: 2 }])]
-    #[case::right_1_lateral('j', 'h', vec![BigramKind::SameFingerSkip { units: 1 }])]
-    #[case::right_1_diagonal('j', 'n', vec![BigramKind::SameFingerSkip { units: 1 }])]
+    #[case::left_1_vertical('q', 'a', vec![BigramKind::SameFingerSkip(SameFingerSkip { units: 1 })])]
+    #[case::left_2_vertical('q', 'z', vec![BigramKind::SameFingerSkip(SameFingerSkip { units: 2 })])]
+    #[case::left_1_lateral('f', 'g', vec![BigramKind::SameFingerSkip(SameFingerSkip { units: 1 })])]
+    #[case::left_1_diagonal('f', 'b', vec![BigramKind::SameFingerSkip(SameFingerSkip { units: 1 })])]
+    #[case::left_2_diagonal('r', 'b', vec![BigramKind::SameFingerSkip(SameFingerSkip { units: 2 })])]
+    #[case::right_1_vertical('u', 'j', vec![BigramKind::SameFingerSkip(SameFingerSkip { units: 1 })])]
+    #[case::right_2_vertical('y', 'n', vec![BigramKind::SameFingerSkip(SameFingerSkip { units: 2 })])]
+    #[case::right_1_lateral('j', 'h', vec![BigramKind::SameFingerSkip(SameFingerSkip { units: 1 })])]
+    #[case::right_1_diagonal('j', 'n', vec![BigramKind::SameFingerSkip(SameFingerSkip { units: 1 })])]
     fn it_calculates_bigram_finger_skip(
         #[case] ch1: char,
         #[case] ch2: char,
@@ -350,16 +364,16 @@ mod bigram_tests {
     }
 
     #[rstest]
-    #[case::left_index('d', 'g', vec![BigramKind::LateralStretch { finger: FingerKind::Index, units: 2 }])]
-    #[case::left_index('e', 't', vec![BigramKind::LateralStretch { finger: FingerKind::Index, units: 2 }])]
-    #[case::left_pinky('"', 's', vec![BigramKind::LateralStretch { finger: FingerKind::Pinky, units: 2 }])]
-    #[case::left_non_adiacent_ring('s', 'g', vec![BigramKind::LateralStretch { finger: FingerKind::Ring, units: 3 }])]
-    #[case::left_non_adiacent_pink('a', 'g', vec![BigramKind::LateralStretch { finger: FingerKind::Pinky, units: 4 }])]
-    #[case::right_index('k', 'h', vec![BigramKind::LateralStretch { finger: FingerKind::Index, units: 2 }])]
-    #[case::right_index('i', 'y', vec![BigramKind::LateralStretch { finger: FingerKind::Index, units: 2 }])]
-    #[case::right_pinky('l', '\'', vec![BigramKind::LateralStretch { finger: FingerKind::Pinky, units: 2 }])]
-    #[case::right_non_adiacent_ring('h', 'l', vec![BigramKind::LateralStretch { finger: FingerKind::Ring, units: 3 }])]
-    #[case::right_non_adiacent_pink('h', ';', vec![BigramKind::LateralStretch { finger: FingerKind::Pinky, units: 4 }])]
+    #[case::left_index('d', 'g', vec![BigramKind::LateralStretch(LateralStretch { finger: FingerKind::Index, units: 2 })])]
+    #[case::left_index('e', 't', vec![BigramKind::LateralStretch(LateralStretch { finger: FingerKind::Index, units: 2 })])]
+    #[case::left_pinky('"', 's', vec![BigramKind::LateralStretch(LateralStretch { finger: FingerKind::Pinky, units: 2 })])]
+    #[case::left_non_adiacent_ring('s', 'g', vec![BigramKind::LateralStretch(LateralStretch { finger: FingerKind::Ring, units: 3 })])]
+    #[case::left_non_adiacent_pink('a', 'g', vec![BigramKind::LateralStretch(LateralStretch { finger: FingerKind::Pinky, units: 4 })])]
+    #[case::right_index('k', 'h', vec![BigramKind::LateralStretch(LateralStretch { finger: FingerKind::Index, units: 2 })])]
+    #[case::right_index('i', 'y', vec![BigramKind::LateralStretch(LateralStretch { finger: FingerKind::Index, units: 2 })])]
+    #[case::right_pinky('l', '\'', vec![BigramKind::LateralStretch(LateralStretch { finger: FingerKind::Pinky, units: 2 })])]
+    #[case::right_non_adiacent_ring('h', 'l', vec![BigramKind::LateralStretch(LateralStretch { finger: FingerKind::Ring, units: 3 })])]
+    #[case::right_non_adiacent_pink('h', ';', vec![BigramKind::LateralStretch(LateralStretch { finger: FingerKind::Pinky, units: 4 })])]
     fn it_calculates_bigram_lateral_stretch(
         #[case] ch1: char,
         #[case] ch2: char,
@@ -371,11 +385,11 @@ mod bigram_tests {
     }
 
     #[rstest]
-    #[case::left_middle_ring_2('c', 'w', vec![BigramKind::Scissor { units: 2, upper_finger: FingerKind::Ring, lower_finger: FingerKind::Middle, adiacent: true }])]
-    #[case::left_middle_pinky_2('c', 'q', vec![BigramKind::Scissor { units: 2, upper_finger: FingerKind::Pinky, lower_finger: FingerKind::Middle, adiacent: false }])]
-    #[case::left_pinky_index_1('z', 'f', vec![BigramKind::Scissor { units: 1, upper_finger: FingerKind::Index, lower_finger: FingerKind::Pinky, adiacent: false }])]
-    #[case::right_ring_index_2('.', 'u', vec![BigramKind::Scissor { units: 2, upper_finger: FingerKind::Index, lower_finger: FingerKind::Ring, adiacent: false }])]
-    #[case::right_middle_ring_2(',', 'o', vec![BigramKind::Scissor { units: 2, upper_finger: FingerKind::Ring, lower_finger: FingerKind::Middle, adiacent: true }])]
+    #[case::left_middle_ring_2('c', 'w', vec![BigramKind::Scissor(Scissor { units: 2, upper_finger: FingerKind::Ring, lower_finger: FingerKind::Middle, adiacent: true })])]
+    #[case::left_middle_pinky_2('c', 'q', vec![BigramKind::Scissor(Scissor { units: 2, upper_finger: FingerKind::Pinky, lower_finger: FingerKind::Middle, adiacent: false })])]
+    #[case::left_pinky_index_1('z', 'f', vec![BigramKind::Scissor(Scissor { units: 1, upper_finger: FingerKind::Index, lower_finger: FingerKind::Pinky, adiacent: false })])]
+    #[case::right_ring_index_2('.', 'u', vec![BigramKind::Scissor(Scissor { units: 2, upper_finger: FingerKind::Index, lower_finger: FingerKind::Ring, adiacent: false })])]
+    #[case::right_middle_ring_2(',', 'o', vec![BigramKind::Scissor(Scissor { units: 2, upper_finger: FingerKind::Ring, lower_finger: FingerKind::Middle, adiacent: true })])]
     fn it_calculates_bigram_scissor(
         #[case] ch1: char,
         #[case] ch2: char,
@@ -412,17 +426,17 @@ mod trigram_tests {
     }
 
     #[rstest]
-    #[case::left_1_vertical('q', 'w', 'a', vec![TrigramKind::SameFingerSkip { units: 1, handedness: Handedness::Same }])]
-    #[case::left_2_vertical('q', 'w', 'z', vec![TrigramKind::SameFingerSkip { units: 2, handedness: Handedness::Same }])]
-    #[case::left_1_vertical('q', 'h', 'a', vec![TrigramKind::SameFingerSkip { units: 1, handedness: Handedness::Alternate }])]
-    #[case::left_2_vertical('q', 'h', 'z', vec![TrigramKind::SameFingerSkip { units: 2, handedness: Handedness::Alternate }])]
-    #[case::left_1_horizontal('r', 'w', 't', vec![TrigramKind::SameFingerSkip { units: 1, handedness: Handedness::Same }])]
-    #[case::left_2_diagonal('r', 'a', 'b', vec![TrigramKind::SameFingerSkip { units: 2, handedness: Handedness::Same }])]
-    #[case::left_1_horizontal_cross_hand('r', 'u', 't', vec![TrigramKind::SameFingerSkip { units: 1, handedness: Handedness::Alternate }])]
-    #[case::right_1_vertical('u', 'i', 'j', vec![TrigramKind::SameFingerSkip { units: 1, handedness: Handedness::Same }])]
-    #[case::right_2_vertical('u', 'i', 'm', vec![TrigramKind::SameFingerSkip { units: 2, handedness: Handedness::Same }])]
-    #[case::right_1_vertical('u', 'g', 'j', vec![TrigramKind::SameFingerSkip { units: 1, handedness: Handedness::Alternate }])]
-    #[case::right_2_vertical('u', 'g', 'm', vec![TrigramKind::SameFingerSkip { units: 2, handedness: Handedness::Alternate }])]
+    #[case::left_1_vertical('q', 'w', 'a', vec![TrigramKind::SameFingerSkip(TrigramSameFingerSkip { skip: SameFingerSkip { units: 1 }, handedness: Handedness::Same })])]
+    #[case::left_2_vertical('q', 'w', 'z', vec![TrigramKind::SameFingerSkip(TrigramSameFingerSkip { skip: SameFingerSkip { units: 2 }, handedness: Handedness::Same })])]
+    #[case::left_1_vertical('q', 'h', 'a', vec![TrigramKind::SameFingerSkip(TrigramSameFingerSkip { skip: SameFingerSkip { units: 1 }, handedness: Handedness::Alternate })])]
+    #[case::left_2_vertical('q', 'h', 'z', vec![TrigramKind::SameFingerSkip(TrigramSameFingerSkip { skip: SameFingerSkip { units: 2 }, handedness: Handedness::Alternate })])]
+    #[case::left_1_horizontal('r', 'w', 't', vec![TrigramKind::SameFingerSkip(TrigramSameFingerSkip { skip: SameFingerSkip { units: 1 }, handedness: Handedness::Same })])]
+    #[case::left_2_diagonal('r', 'a', 'b', vec![TrigramKind::SameFingerSkip(TrigramSameFingerSkip { skip: SameFingerSkip { units: 2 }, handedness: Handedness::Same })])]
+    #[case::left_1_horizontal_cross_hand('r', 'u', 't', vec![TrigramKind::SameFingerSkip(TrigramSameFingerSkip { skip: SameFingerSkip { units: 1 }, handedness: Handedness::Alternate })])]
+    #[case::right_1_vertical('u', 'i', 'j', vec![TrigramKind::SameFingerSkip(TrigramSameFingerSkip { skip: SameFingerSkip { units: 1 }, handedness: Handedness::Same })])]
+    #[case::right_2_vertical('u', 'i', 'm', vec![TrigramKind::SameFingerSkip(TrigramSameFingerSkip { skip: SameFingerSkip { units: 2 }, handedness: Handedness::Same })])]
+    #[case::right_1_vertical('u', 'g', 'j', vec![TrigramKind::SameFingerSkip(TrigramSameFingerSkip { skip: SameFingerSkip { units: 1 }, handedness: Handedness::Alternate })])]
+    #[case::right_2_vertical('u', 'g', 'm', vec![TrigramKind::SameFingerSkip(TrigramSameFingerSkip { skip: SameFingerSkip { units: 2 }, handedness: Handedness::Alternate })])]
     fn it_calculates_trigram_finger_skip(
         #[case] ch1: char,
         #[case] ch2: char,
@@ -434,10 +448,10 @@ mod trigram_tests {
     }
 
     #[rstest]
-    #[case::left_non_adiacent_cross_hand('s', 'y', 'g', vec![TrigramKind::LateralStretch { finger: FingerKind::Ring, units: 3, handedness: Handedness::Alternate }, TrigramKind::Alternation ])]
-    #[case::left_index_cross_hand('d', 'u', 'g', vec![ TrigramKind::LateralStretch { finger: FingerKind::Index, units: 2, handedness: Handedness::Alternate }, TrigramKind::Alternation ])]
-    #[case::right_index_cross_hand('k', 'e', 'h', vec![ TrigramKind::LateralStretch { finger: FingerKind::Index, units: 2, handedness: Handedness::Alternate }, TrigramKind::Alternation ])]
-    #[case::right_pinky_same_hand('l', 'i', '\'', vec![ TrigramKind::LateralStretch { finger: FingerKind::Pinky, units: 2, handedness: Handedness::Same }, TrigramKind::Redirect { strength: RedirectStrength::Weak } ])]
+    #[case::left_non_adiacent_cross_hand('s', 'y', 'g', vec![TrigramKind::LateralStretch(TrigramLateralStretch { stretch: LateralStretch { finger: FingerKind::Ring, units: 3 }, handedness: Handedness::Alternate }), TrigramKind::Alternation ])]
+    #[case::left_index_cross_hand('d', 'u', 'g', vec![ TrigramKind::LateralStretch(TrigramLateralStretch { stretch: LateralStretch { finger: FingerKind::Index, units: 2 }, handedness: Handedness::Alternate }), TrigramKind::Alternation ])]
+    #[case::right_index_cross_hand('k', 'e', 'h', vec![ TrigramKind::LateralStretch(TrigramLateralStretch { stretch: LateralStretch { finger: FingerKind::Index, units: 2 }, handedness: Handedness::Alternate }), TrigramKind::Alternation ])]
+    #[case::right_pinky_same_hand('l', 'i', '\'', vec![ TrigramKind::LateralStretch(TrigramLateralStretch { stretch: LateralStretch { finger: FingerKind::Pinky, units: 2 }, handedness: Handedness::Same }), TrigramKind::Redirect(Redirect { strength: RedirectStrength::Weak }) ])]
     fn it_calculates_trigram_lateral_stretch(
         #[case] ch1: char,
         #[case] ch2: char,
@@ -449,11 +463,11 @@ mod trigram_tests {
     }
 
     #[rstest]
-    #[case::left_middle_ring_same_hand('c', 'a', 'w', vec![ TrigramKind::Scissor { units: 2, upper_finger: FingerKind::Ring, lower_finger: FingerKind::Middle, handedness: Handedness::Same, adiacent: true }, TrigramKind::Redirect { strength: RedirectStrength::Weak } ])]
-    #[case::left_middle_ring_cross_hand('c', 'j', 'w', vec![ TrigramKind::Scissor { units: 2, upper_finger: FingerKind::Ring, lower_finger: FingerKind::Middle, handedness: Handedness::Alternate, adiacent: true }, TrigramKind::Alternation ])]
-    #[case::left_middle_pinky_cross_hand('c', 'j', 'q', vec![ TrigramKind::Scissor { units: 2, upper_finger: FingerKind::Pinky, lower_finger: FingerKind::Middle, handedness: Handedness::Alternate, adiacent: false }, TrigramKind::Alternation ])]
-    #[case::right_ring_index_same_hand('.', 'k', 'u', vec![ TrigramKind::Scissor { units: 2, upper_finger: FingerKind::Index, lower_finger: FingerKind::Ring, handedness: Handedness::Same, adiacent: false }, TrigramKind::Roll { length: 3, direction: RollDirection::In } ])]
-    #[case::right_middle_ring_cross_hand(',', 'f', 'o', vec![ TrigramKind::Scissor { units: 2, upper_finger: FingerKind::Ring, lower_finger: FingerKind::Middle, handedness: Handedness::Alternate, adiacent: true }, TrigramKind::Alternation ])]
+    #[case::left_middle_ring_same_hand('c', 'a', 'w', vec![ TrigramKind::Scissor(TrigramScissor { scissor: Scissor { units: 2, upper_finger: FingerKind::Ring, lower_finger: FingerKind::Middle, adiacent: true }, handedness: Handedness::Same }), TrigramKind::Redirect(Redirect { strength: RedirectStrength::Weak }) ])]
+    #[case::left_middle_ring_cross_hand('c', 'j', 'w', vec![ TrigramKind::Scissor(TrigramScissor { scissor: Scissor { units: 2, upper_finger: FingerKind::Ring, lower_finger: FingerKind::Middle, adiacent: true }, handedness: Handedness::Alternate }), TrigramKind::Alternation ])]
+    #[case::left_middle_pinky_cross_hand('c', 'j', 'q', vec![ TrigramKind::Scissor(TrigramScissor { scissor: Scissor { units: 2, upper_finger: FingerKind::Pinky, lower_finger: FingerKind::Middle, adiacent: false }, handedness: Handedness::Alternate }), TrigramKind::Alternation ])]
+    #[case::right_ring_index_same_hand('.', 'k', 'u', vec![ TrigramKind::Scissor(TrigramScissor { scissor: Scissor { units: 2, upper_finger: FingerKind::Index, lower_finger: FingerKind::Ring, adiacent: false }, handedness: Handedness::Same }), TrigramKind::Roll(Roll { length: 3, direction: RollDirection::In }) ])]
+    #[case::right_middle_ring_cross_hand(',', 'f', 'o', vec![ TrigramKind::Scissor(TrigramScissor { scissor: Scissor { units: 2, upper_finger: FingerKind::Ring, lower_finger: FingerKind::Middle, adiacent: true }, handedness: Handedness::Alternate }), TrigramKind::Alternation ])]
     fn it_calculates_trigram_scissor(
         #[case] ch1: char,
         #[case] ch2: char,
@@ -465,23 +479,23 @@ mod trigram_tests {
     }
 
     #[rstest]
-    #[case::left_triple('q', 'w', 'e', vec![TrigramKind::Roll { length: 3, direction: RollDirection::In }])]
-    #[case::left_triple('q', 'e', 'r', vec![TrigramKind::Roll { length: 3, direction: RollDirection::In }])]
-    #[case::left_triple('r', 'e', 'q', vec![TrigramKind::Roll { length: 3, direction: RollDirection::Out }])]
-    #[case::left_triple('e', 'w', 'q', vec![TrigramKind::Roll { length: 3, direction: RollDirection::Out }])]
-    #[case::right_triple('o', 'i', 'u', vec![TrigramKind::Roll { length: 3, direction: RollDirection::In }])]
-    #[case::right_triple('p', 'i', 'u', vec![TrigramKind::Roll { length: 3, direction: RollDirection::In }])]
-    #[case::right_triple('u', 'i', 'p', vec![TrigramKind::Roll { length: 3, direction: RollDirection::Out }])]
-    #[case::right_triple('i', 'o', 'p', vec![TrigramKind::Roll { length: 3, direction: RollDirection::Out }])]
-    #[case::left_triple_mixed_rows('a', 'w', 'd', vec![TrigramKind::Roll { length: 3, direction: RollDirection::In }])]
-    #[case::left_double('q', 'w', 'p', vec![TrigramKind::Roll { length: 2, direction: RollDirection::In }])]
-    #[case::left_double('q', 'e', 'p', vec![TrigramKind::Roll { length: 2, direction: RollDirection::In }])]
-    #[case::left_double('t', 'e', 'p', vec![TrigramKind::Roll { length: 2, direction: RollDirection::Out }])]
-    #[case::left_double('e', 'w', 'p', vec![TrigramKind::Roll { length: 2, direction: RollDirection::Out }])]
-    #[case::right_double('o', 'i', 'a', vec![TrigramKind::Roll { length: 2, direction: RollDirection::In }])]
-    #[case::right_double('p', 'i', 'a', vec![TrigramKind::Roll { length: 2, direction: RollDirection::In }])]
-    #[case::right_double('y', 'i', 'a', vec![TrigramKind::Roll { length: 2, direction: RollDirection::Out }])]
-    #[case::right_double('i', 'o', 'a', vec![TrigramKind::Roll { length: 2, direction: RollDirection::Out }])]
+    #[case::left_triple('q', 'w', 'e', vec![TrigramKind::Roll(Roll { length: 3, direction: RollDirection::In })])]
+    #[case::left_triple('q', 'e', 'r', vec![TrigramKind::Roll(Roll { length: 3, direction: RollDirection::In })])]
+    #[case::left_triple('r', 'e', 'q', vec![TrigramKind::Roll(Roll { length: 3, direction: RollDirection::Out })])]
+    #[case::left_triple('e', 'w', 'q', vec![TrigramKind::Roll(Roll { length: 3, direction: RollDirection::Out })])]
+    #[case::right_triple('o', 'i', 'u', vec![TrigramKind::Roll(Roll { length: 3, direction: RollDirection::In })])]
+    #[case::right_triple('p', 'i', 'u', vec![TrigramKind::Roll(Roll { length: 3, direction: RollDirection::In })])]
+    #[case::right_triple('u', 'i', 'p', vec![TrigramKind::Roll(Roll { length: 3, direction: RollDirection::Out })])]
+    #[case::right_triple('i', 'o', 'p', vec![TrigramKind::Roll(Roll { length: 3, direction: RollDirection::Out })])]
+    #[case::left_triple_mixed_rows('a', 'w', 'd', vec![TrigramKind::Roll(Roll { length: 3, direction: RollDirection::In })])]
+    #[case::left_double('q', 'w', 'p', vec![TrigramKind::Roll(Roll { length: 2, direction: RollDirection::In })])]
+    #[case::left_double('q', 'e', 'p', vec![TrigramKind::Roll(Roll { length: 2, direction: RollDirection::In })])]
+    #[case::left_double('t', 'e', 'p', vec![TrigramKind::Roll(Roll { length: 2, direction: RollDirection::Out })])]
+    #[case::left_double('e', 'w', 'p', vec![TrigramKind::Roll(Roll { length: 2, direction: RollDirection::Out })])]
+    #[case::right_double('o', 'i', 'a', vec![TrigramKind::Roll(Roll { length: 2, direction: RollDirection::In })])]
+    #[case::right_double('p', 'i', 'a', vec![TrigramKind::Roll(Roll { length: 2, direction: RollDirection::In })])]
+    #[case::right_double('y', 'i', 'a', vec![TrigramKind::Roll(Roll { length: 2, direction: RollDirection::Out })])]
+    #[case::right_double('i', 'o', 'a', vec![TrigramKind::Roll(Roll { length: 2, direction: RollDirection::Out })])]
     fn it_calculates_trigram_roll(
         #[case] ch1: char,
         #[case] ch2: char,
@@ -493,8 +507,8 @@ mod trigram_tests {
     }
 
     #[rstest]
-    #[case::left_strong('q', 'e', 'w', vec![TrigramKind::Redirect { strength: RedirectStrength::Weak }])]
-    #[case::left_weak('q', 't', 'e', vec![TrigramKind::Redirect { strength: RedirectStrength::Strong }])]
+    #[case::left_strong('q', 'e', 'w', vec![TrigramKind::Redirect(Redirect { strength: RedirectStrength::Weak })])]
+    #[case::left_weak('q', 't', 'e', vec![TrigramKind::Redirect(Redirect { strength: RedirectStrength::Strong })])]
     fn it_calculates_trigram_redirect(
         #[case] ch1: char,
         #[case] ch2: char,

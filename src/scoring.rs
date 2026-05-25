@@ -35,10 +35,11 @@ mod scoring {
         }
 
         pub fn bigram_skips(_bigram: &Bigram, kind: &BigramKind, count: f64) -> Option<(u8, f64)> {
-            match kind {
-                BigramKind::SameFingerSkip { units } => Some((*units, count)),
-                _ => None,
-            }
+            let BigramKind::SameFingerSkip(skip) = kind else {
+                return None;
+            };
+
+            Some((skip.units, count))
         }
 
         pub fn bigram_lateral_stretches(
@@ -46,10 +47,11 @@ mod scoring {
             kind: &BigramKind,
             count: f64,
         ) -> Option<(FingerKind, f64)> {
-            match kind {
-                BigramKind::LateralStretch { finger, .. } => Some((*finger, count)),
-                _ => None,
-            }
+            let BigramKind::LateralStretch(stretch) = kind else {
+                return None;
+            };
+
+            Some((stretch.finger, count))
         }
 
         pub fn bigram_scissors(
@@ -57,17 +59,14 @@ mod scoring {
             kind: &BigramKind,
             count: f64,
         ) -> Option<(u8, f64)> {
-            match kind {
-                BigramKind::Scissor {
-                    units,
-                    upper_finger,
-                    lower_finger,
-                    ..
-                } if is_scissor_metric(*units, *lower_finger, *upper_finger) => {
-                    Some((*units, count))
-                }
-                _ => None,
+            let BigramKind::Scissor(scissor) = kind else {
+                return None;
+            };
+            if !is_scissor_metric(scissor) {
+                return None;
             }
+
+            Some((scissor.units, count))
         }
 
         pub fn bigram_others(_bigram: &Bigram, kind: &BigramKind, count: f64) -> Option<f64> {
@@ -79,13 +78,14 @@ mod scoring {
             kind: &TrigramKind,
             count: f64,
         ) -> Option<(u8, f64)> {
-            match kind {
-                TrigramKind::SameFingerSkip {
-                    units,
-                    handedness: Handedness::Same,
-                } => Some((*units, count)),
-                _ => None,
+            let TrigramKind::SameFingerSkip(skip) = kind else {
+                return None;
+            };
+            if skip.handedness != Handedness::Same {
+                return None;
             }
+
+            Some((skip.skip.units, count))
         }
 
         pub fn trigram_skips_alternation(
@@ -93,13 +93,14 @@ mod scoring {
             kind: &TrigramKind,
             count: f64,
         ) -> Option<(u8, f64)> {
-            match kind {
-                TrigramKind::SameFingerSkip {
-                    units,
-                    handedness: Handedness::Alternate,
-                } => Some((*units, count)),
-                _ => None,
+            let TrigramKind::SameFingerSkip(skip) = kind else {
+                return None;
+            };
+            if skip.handedness != Handedness::Alternate {
+                return None;
             }
+
+            Some((skip.skip.units, count))
         }
 
         pub fn trigram_scissors_same_hand(
@@ -107,20 +108,14 @@ mod scoring {
             kind: &TrigramKind,
             count: f64,
         ) -> Option<(u8, f64)> {
-            match kind {
-                TrigramKind::Scissor {
-                    units,
-                    handedness,
-                    lower_finger,
-                    upper_finger,
-                    ..
-                } if *handedness == Handedness::Alternate
-                    || is_scissor_metric(*units, *lower_finger, *upper_finger) =>
-                {
-                    Some((*units, count))
-                }
-                _ => None,
+            let TrigramKind::Scissor(scissor) = kind else {
+                return None;
+            };
+            if scissor.handedness != Handedness::Alternate && !is_scissor_metric(&scissor.scissor) {
+                return None;
             }
+
+            Some((scissor.scissor.units, count))
         }
 
         pub fn trigram_scissors_alternation(
@@ -128,20 +123,14 @@ mod scoring {
             kind: &TrigramKind,
             count: f64,
         ) -> Option<(u8, f64)> {
-            match kind {
-                TrigramKind::Scissor {
-                    units,
-                    handedness,
-                    lower_finger,
-                    upper_finger,
-                    ..
-                } if *handedness == Handedness::Same
-                    || !is_scissor_metric(*units, *lower_finger, *upper_finger) =>
-                {
-                    Some((*units, count))
-                }
-                _ => None,
+            let TrigramKind::Scissor(scissor) = kind else {
+                return None;
+            };
+            if scissor.handedness != Handedness::Same && is_scissor_metric(&scissor.scissor) {
+                return None;
             }
+
+            Some((scissor.scissor.units, count))
         }
 
         pub fn trigram_lateral_stretches_same_hand(
@@ -149,14 +138,14 @@ mod scoring {
             kind: &TrigramKind,
             count: f64,
         ) -> Option<(FingerKind, f64)> {
-            match kind {
-                TrigramKind::LateralStretch {
-                    handedness: Handedness::Same,
-                    finger,
-                    ..
-                } => Some((*finger, count)),
-                _ => None,
+            let TrigramKind::LateralStretch(stretch) = kind else {
+                return None;
+            };
+            if stretch.handedness != Handedness::Same {
+                return None;
             }
+
+            Some((stretch.stretch.finger, count))
         }
 
         pub fn trigram_lateral_stretches_alternation(
@@ -164,14 +153,14 @@ mod scoring {
             kind: &TrigramKind,
             count: f64,
         ) -> Option<(FingerKind, f64)> {
-            match kind {
-                TrigramKind::LateralStretch {
-                    handedness: Handedness::Alternate,
-                    finger,
-                    ..
-                } => Some((*finger, count)),
-                _ => None,
+            let TrigramKind::LateralStretch(stretch) = kind else {
+                return None;
+            };
+            if stretch.handedness != Handedness::Alternate {
+                return None;
             }
+
+            Some((stretch.stretch.finger, count))
         }
 
         pub fn trigram_redirects(
@@ -179,10 +168,11 @@ mod scoring {
             kind: &TrigramKind,
             count: f64,
         ) -> Option<(RedirectStrength, f64)> {
-            match kind {
-                TrigramKind::Redirect { strength } => Some((*strength, count)),
-                _ => None,
-            }
+            let TrigramKind::Redirect(redirect) = kind else {
+                return None;
+            };
+
+            Some((redirect.strength, count))
         }
 
         pub fn trigram_roll(
@@ -190,13 +180,14 @@ mod scoring {
             kind: &TrigramKind,
             count: f64,
         ) -> Option<(RollDirection, f64)> {
-            match kind {
-                TrigramKind::Roll {
-                    length: 3,
-                    direction,
-                } => Some((*direction, count)),
-                _ => None,
+            let TrigramKind::Roll(roll) = kind else {
+                return None;
+            };
+            if roll.length != 3 {
+                return None;
             }
+
+            Some((roll.direction, count))
         }
 
         pub fn trigram_roll_bigrams(
@@ -204,13 +195,14 @@ mod scoring {
             kind: &TrigramKind,
             count: f64,
         ) -> Option<(RollDirection, f64)> {
-            match kind {
-                TrigramKind::Roll {
-                    length: 2,
-                    direction,
-                } => Some((*direction, count)),
-                _ => None,
+            let TrigramKind::Roll(roll) = kind else {
+                return None;
+            };
+            if roll.length != 2 {
+                return None;
             }
+
+            Some((roll.direction, count))
         }
 
         pub fn trigram_alternations(
@@ -508,8 +500,10 @@ mod scoring {
         (FingerKind::Pinky, FingerKind::Index),
     ];
 
-    fn is_scissor_metric(units: u8, lower_finger: FingerKind, upper_finger: FingerKind) -> bool {
-        units > 1 || (units == 1 && !ALLOWED_SCISSORS.contains(&(lower_finger, upper_finger)))
+    fn is_scissor_metric(scissor: &Scissor) -> bool {
+        scissor.units > 1
+            || (scissor.units == 1
+                && !ALLOWED_SCISSORS.contains(&(scissor.lower_finger, scissor.upper_finger)))
     }
 
     fn percentage(v: f64, total: f64) -> f64 {
