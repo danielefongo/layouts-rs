@@ -46,6 +46,13 @@ struct OptimizeArgs {
     run_options: RunOptions,
     #[arg(
         long,
+        default_value = "100",
+        value_parser = CommonConfig::parse_ngram_percentile,
+        help = "Keep only the most frequent bigrams/trigrams covering this ngram frequency percentile"
+    )]
+    ngram_percentile: f64,
+    #[arg(
+        long,
         short,
         value_parser = CommonConfig::parse_layout_string,
         help = "Reference layout preset or custom layout string to compare against (defaults to initial layout)"
@@ -162,6 +169,22 @@ impl CommonConfig {
         Ok(Corpus::new(corpus_map))
     }
 
+    fn parse_ngram_percentile(value: &str) -> Result<f64, String> {
+        let percentile: f64 = value
+            .parse()
+            .map_err(|e| format!("Invalid ngram percentile {value}: {e}"))?;
+
+        if !percentile.is_finite() {
+            return Err("ngram percentile must be finite".to_string());
+        }
+
+        if !(10.0..=100.0).contains(&percentile) {
+            return Err("ngram percentile must be between 10 and 100".to_string());
+        }
+
+        Ok(percentile)
+    }
+
     fn corpus(&self) -> Corpus {
         let mut aggregated: HashMap<String, f64> = HashMap::new();
 
@@ -172,6 +195,10 @@ impl CommonConfig {
         }
 
         Corpus::new(aggregated)
+    }
+
+    fn optimization_corpus(&self, ngram_percentile: f64) -> Corpus {
+        self.corpus().top_ngram_percentile(ngram_percentile)
     }
 }
 
@@ -206,6 +233,7 @@ impl Command {
 
                 let corpus = args.common.corpus();
                 let analyzer = Analyzer::new(corpus);
+                let optimization_analyzer = Analyzer::new(args.common.optimization_corpus(args.ngram_percentile));
 
                 let reference_layout = match &args.reference_layout {
                     Some(layout_str) => Layout::new(layout_str, &config.layout)
@@ -218,7 +246,7 @@ impl Command {
                 let stats_before = Stats::from(metrics_before);
 
                 let optimizer = Self::select_optimizer(
-                    analyzer.clone(),
+                    optimization_analyzer,
                     &args.run_options,
                     &config.optimization,
                 );

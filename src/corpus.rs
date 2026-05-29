@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hash};
 
 pub type TrigramChars = (char, char, char);
 pub type BigramChars = (char, char);
@@ -40,6 +40,38 @@ impl Corpus {
 
         corpus
     }
+
+    pub fn top_ngram_percentile(self, percentile: f64) -> Self {
+        Self {
+            bigrams: top_entries_covering_percentile(&self.bigrams, percentile),
+            trigrams: top_entries_covering_percentile(&self.trigrams, percentile),
+            ..self
+        }
+    }
+}
+
+fn top_entries_covering_percentile<K: Copy + Hash + Ord>(
+    entries: &HashMap<K, f64>,
+    percentile: f64,
+) -> HashMap<K, f64> {
+    let total_count: f64 = entries.values().sum();
+    let target_count = total_count * percentile / 100.0;
+    let mut sorted_entries = entries.iter().map(|(k, v)| (*k, *v)).collect::<Vec<_>>();
+    sorted_entries.sort_by(|(_, count_a), (_, count_b)| count_b.total_cmp(count_a));
+
+    let mut cumulative_count = 0.0;
+    let mut top_entries = HashMap::new();
+
+    for (key, count) in sorted_entries {
+        if cumulative_count >= target_count {
+            break;
+        }
+
+        cumulative_count += count;
+        top_entries.insert(key, count);
+    }
+
+    top_entries
 }
 
 #[cfg(test)]
@@ -88,6 +120,28 @@ mod tests {
                     (('d', 'e', 'f'), 5.0),
                     (('e', 'f', 'g'), 5.0),
                 ]
+        );
+    }
+
+    #[test]
+    fn it_keeps_top_ngrams_covering_percentile() {
+        let corpus = Corpus::new([
+            ("abc".to_string(), 10.0),
+            ("abd".to_string(), 5.0),
+            ("xyz".to_string(), 1.0),
+        ]);
+
+        let top = corpus.top_ngram_percentile(80.0);
+
+        check!(top.word_items == corpus.word_items);
+        check!(top.unigrams == corpus.unigrams);
+        check!(
+            into_ordered_vec(&top.bigrams)
+                == vec![(('a', 'b'), 15.0), (('b', 'c'), 10.0), (('b', 'd'), 5.0)]
+        );
+        check!(
+            into_ordered_vec(&top.trigrams)
+                == vec![(('a', 'b', 'c'), 10.0), (('a', 'b', 'd'), 5.0)]
         );
     }
 
